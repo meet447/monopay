@@ -6,11 +6,13 @@ import bs58 from 'bs58';
 import { WalletContextState } from '../types/state';
 import { usePin } from './PinContext';
 import { PriceService } from '../utils/prices';
+import { ApiClient } from '../api/client';
+import { API_BASE_URL } from '../config';
 
 // Extending state to support multiple wallets
 export type MultiWalletContextState = WalletContextState & {
-  allWallets: Array<{address: string, label: string}>;
-  importWallet: (privateKey: string, label: string) => Promise<void>;
+  allWallets: Array<{address: string, label: string, handle?: string}>;
+  importWallet: (privateKey: string, label: string, handle?: string) => Promise<void>;
   switchWallet: (address: string) => void;
   getActiveKeypair: () => Promise<Keypair | null>;
   refreshBalance: () => Promise<void>;
@@ -22,8 +24,8 @@ export type MultiWalletContextState = WalletContextState & {
 
 const MultiWalletContext = createContext<MultiWalletContextState | undefined>(undefined);
 
-const WALLETS_STORAGE_KEY = 'solupi_wallets_list';
-const ACTIVE_WALLET_KEY = 'solupi_active_wallet';
+const WALLETS_STORAGE_KEY = 'monopay_wallets_list';
+const ACTIVE_WALLET_KEY = 'monopay_active_wallet';
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [publicKey, setPublicKey] = useState<PublicKey | null>(null);
@@ -108,7 +110,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     loadWallets();
   }, []);
 
-  const importWallet = useCallback(async (privateKey: string, label: string) => {
+  const importWallet = useCallback(async (privateKey: string, label: string, handle?: string) => {
     try {
       let keypair: Keypair;
       const trimmed = privateKey.trim();
@@ -134,12 +136,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       }
 
       const address = keypair.publicKey.toBase58();
+
+      // Register handle if provided
+      if (handle) {
+        const client = new ApiClient({ baseUrl: API_BASE_URL });
+        await client.registerHandle({ handle, wallet: address });
+      }
+
       const secretBase64 = Buffer.from(keypair.secretKey).toString('base64');
       
       // Store the secret key encrypted by the OS keychain
       await SecureStore.setItemAsync(`secret_${address}`, secretBase64);
       
-      const newList = [...allWallets, { address, label }];
+      const newList = [...allWallets, { address, label, handle }];
       await SecureStore.setItemAsync(WALLETS_STORAGE_KEY, JSON.stringify(newList));
       await SecureStore.setItemAsync(ACTIVE_WALLET_KEY, address);
       

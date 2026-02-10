@@ -97,20 +97,25 @@ pub async fn execute_payment_intent(
     }
 
     let mut store = state.store.write().await;
-    let session = store
-        .sessions
-        .get_mut(&user_id)
-        .ok_or_else(|| AppError::unauthorized("active session required"))?;
+    
+    // Scoped block to handle session checks and get limits
+    let (per_tx_limit, daily_limit, used_today) = {
+        let session = store
+            .sessions
+            .get_mut(&user_id)
+            .ok_or_else(|| AppError::unauthorized("active session required"))?;
 
-    if session.id != payload.session_id {
-        return Err(AppError::unauthorized("session mismatch"));
-    }
-    if Utc::now() > session.expires_at {
-        session.status = "expired".to_string();
-        return Err(AppError::unauthorized(
-            "session expired, wallet re-authorization required",
-        ));
-    }
+        if session.id != payload.session_id {
+            return Err(AppError::unauthorized("session mismatch"));
+        }
+        if Utc::now() > session.expires_at {
+            session.status = "expired".to_string();
+            return Err(AppError::unauthorized(
+                "session expired, wallet re-authorization required",
+            ));
+        }
+        (session.per_tx_limit_inr, session.daily_limit_inr, session.used_today_inr)
+    };
 
     let intent = store
         .payment_intents
@@ -127,26 +132,34 @@ pub async fn execute_payment_intent(
             "quote expired, create new payment intent",
         ));
     }
-    if intent.inr_amount > session.per_tx_limit_inr {
+    if intent.inr_amount > per_tx_limit {
         return Err(AppError::unauthorized(
             "session per transaction limit exceeded",
         ));
     }
-    if session.used_today_inr + intent.inr_amount > session.daily_limit_inr {
+    if used_today + intent.inr_amount > daily_limit {
         return Err(AppError::unauthorized("session daily limit exceeded"));
     }
 
-    session.used_today_inr += intent.inr_amount;
-
+    // Now update session and intent
+    let inr_amount = intent.inr_amount;
     let signature = format!("sig_{}", Uuid::new_v4().simple());
     intent.status = "submitted".to_string();
     intent.mode = Some("session_fast_path".to_string());
     intent.signature = Some(signature.clone());
 
+    let intent_id = intent.id.clone();
+    let intent_status = intent.status.clone();
+    let intent_mode = intent.mode.clone().unwrap_or_else(|| "unknown".to_string());
+
+    if let Some(session) = store.sessions.get_mut(&user_id) {
+        session.used_today_inr += inr_amount;
+    }
+
     Ok(Json(ExecutePaymentIntentResponse {
-        id: intent.id.clone(),
-        status: intent.status.clone(),
-        mode: intent.mode.clone().unwrap_or_else(|| "unknown".to_string()),
+        id: intent_id,
+        status: intent_status,
+        mode: intent_mode,
         signature: signature.clone(),
         explorer_url: format!("https://solscan.io/tx/{signature}"),
     }))

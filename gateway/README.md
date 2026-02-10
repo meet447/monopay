@@ -1,4 +1,4 @@
-# SolUPI Gateway Scaffold
+# monopay Gateway Scaffold
 
 Rust `axum` API scaffold for UPI-like crypto flow with PIN + session authorization.
 
@@ -10,8 +10,8 @@ cargo run
 
 Optional env:
 ```bash
-SOLUPI_HOST=0.0.0.0
-SOLUPI_PORT=8080
+MONOPAY_HOST=0.0.0.0
+MONOPAY_PORT=8080
 ```
 
 ## Demo API Sequence

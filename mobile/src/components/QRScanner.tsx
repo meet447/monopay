@@ -62,7 +62,7 @@ export function QRScanner({ visible, onClose, onScan }: Props) {
         </TouchableOpacity>
         
         <View style={styles.footer} pointerEvents="none">
-          <Text style={styles.footerText}>Scan SolPay or UPI QR</Text>
+          <Text style={styles.footerText}>Scan monopay or UPI QR</Text>
         </View>
       </View>
     </Modal>

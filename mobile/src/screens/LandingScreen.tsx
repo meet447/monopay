@@ -16,21 +16,27 @@ import {
 import { LucideZap, LucidePlus } from "lucide-react-native";
 import { useWallet } from "../context/WalletContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { VPA_DOMAIN } from "../config";
 
 export function LandingScreen() {
   const insets = useSafeAreaInsets();
   const { importWallet } = useWallet() as any;
   const [showImport, setShowImport] = useState(false);
   const [privateKey, setPrivateKey] = useState("");
+  const [handle, setHandle] = useState("");
   const [label] = useState("Main Account");
   const [loading, setLoading] = useState(false);
 
   const handleImport = async () => {
     if (!privateKey) return;
+    if (!handle) {
+      Alert.alert("Required", "Please choose a monopay handle.");
+      return;
+    }
     Keyboard.dismiss();
     setLoading(true);
     try {
-      await importWallet(privateKey, label);
+      await importWallet(privateKey, label, handle);
     } catch (e: any) {
       Alert.alert("Error", e.message);
     } finally {
@@ -50,7 +56,7 @@ export function LandingScreen() {
             keyboardShouldPersistTaps="handled"
           >
             <LucideZap size={80} color="#14F195" style={styles.logo} />
-            <Text style={styles.title}>SolUPI</Text>
+            <Text style={styles.title}>monopay</Text>
             <Text style={styles.subtitle}>Solana payments as simple as UPI.</Text>
 
             {!showImport ? (
@@ -65,18 +71,33 @@ export function LandingScreen() {
               </View>
             ) : (
               <View style={styles.importForm}>
-                <Text style={styles.label}>Enter Secret Key</Text>
-                <TextInput
-                  style={styles.input}
-                  value={privateKey}
-                  onChangeText={setPrivateKey}
-                  placeholder="Private Key (Secret Array or Base58)"
-                  placeholderTextColor="#444"
-                  secureTextEntry={false}
-                  multiline={true}
-                  blurOnSubmit={true}
-                  onSubmitEditing={handleImport}
-                />
+                <View>
+                  <Text style={styles.label}>Choose Handle</Text>
+                  <TextInput
+                    style={styles.inputSingle}
+                    value={handle}
+                    onChangeText={setHandle}
+                    placeholder="e.g. john123"
+                    placeholderTextColor="#444"
+                    autoCapitalize="none"
+                  />
+                  <Text style={styles.hint}>Your VPA will be {handle || 'name'}{VPA_DOMAIN}</Text>
+                </View>
+
+                <View>
+                  <Text style={styles.label}>Enter Secret Key</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={privateKey}
+                    onChangeText={setPrivateKey}
+                    placeholder="Private Key (Secret Array or Base58)"
+                    placeholderTextColor="#444"
+                    secureTextEntry={false}
+                    multiline={true}
+                    blurOnSubmit={true}
+                  />
+                </View>
+
                 <TouchableOpacity 
                   style={styles.primaryButton}
                   onPress={handleImport}
@@ -98,7 +119,7 @@ export function LandingScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
-  content: { flex: 1, padding: 32, justifyContent: "center", alignItems: "center" },
+  content: { padding: 32, justifyContent: "center", alignItems: "center" },
   logo: { marginBottom: 16 },
   title: { fontSize: 48, fontWeight: "900", color: "#fff" },
   subtitle: { fontSize: 18, color: "#666", textAlign: "center", marginBottom: 64 },
@@ -114,8 +135,8 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   buttonText: { color: "#000", fontSize: 18, fontWeight: "700" },
-  importForm: { width: "100%", gap: 16 },
-  label: { color: "#999", fontSize: 14, fontWeight: "600" },
+  importForm: { width: "100%", gap: 24 },
+  label: { color: "#999", fontSize: 14, fontWeight: "600", marginBottom: 8 },
   input: {
     backgroundColor: "#111",
     borderWidth: 1,
@@ -123,8 +144,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     color: "#fff",
-    minHeight: 120,
+    minHeight: 100,
     fontSize: 14,
   },
+  inputSingle: {
+    backgroundColor: "#111",
+    borderWidth: 1,
+    borderColor: "#222",
+    borderRadius: 12,
+    padding: 16,
+    color: "#fff",
+    fontSize: 16,
+  },
+  hint: { color: "#444", fontSize: 12, marginTop: 4 },
   cancelText: { color: "#666", textAlign: "center", marginTop: 8 },
 });

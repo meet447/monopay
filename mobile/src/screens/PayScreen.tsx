@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { ApiClient } from "../api/client";
 import { runUpiLikePayFlow } from "../features/pay/payController";
 import { QRScanner } from "../components/QRScanner";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { API_BASE_URL } from "../config";
 
 type Props = {
   apiBaseUrl: string;
@@ -31,13 +32,44 @@ export function PayScreen({ apiBaseUrl, userId, navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { publicKey, allWallets, switchWallet, isLoading: isConnecting } = useWallet() as any;
   
-  const [handle, setHandle] = useState(route?.params?.qrData || "@priya");
+  const [handle, setHandle] = useState(route?.params?.qrData || "");
+  const [resolvedName, setResolvedName] = useState("");
+  const [recipientWallet, setRecipientWallet] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [showWalletPicker, setShowWalletPicker] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
+
+  // Resolution effect
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (!handle || handle.length < 3) {
+        setResolvedName("");
+        setRecipientWallet(null);
+        setIsVerified(false);
+        return;
+      }
+      setIsResolving(true);
+      try {
+        const client = new ApiClient({ baseUrl: API_BASE_URL });
+        const res = await client.resolveHandle(handle);
+        setResolvedName(res.handle);
+        setRecipientWallet(res.wallet);
+        setIsVerified(true);
+      } catch (e) {
+        setResolvedName("Unknown User");
+        setRecipientWallet(null);
+        setIsVerified(false);
+      } finally {
+        setIsResolving(false);
+      }
+    }, 500); // Debounce resolution
+    return () => clearTimeout(timer);
+  }, [handle]);
 
   // Update handle if route params change
-  React.useEffect(() => {
+  useEffect(() => {
     if (route?.params?.qrData) {
       let resolvedHandle = route.params.qrData;
       if (resolvedHandle.startsWith("solana:")) {
@@ -50,6 +82,10 @@ export function PayScreen({ apiBaseUrl, userId, navigation, route }: Props) {
   const { quote, isLoading: isQuoteLoading } = useQuote(amount);
 
   const onPayPress = () => {
+    if (!isVerified || !recipientWallet) {
+      Alert.alert("Error", "Please enter a valid monopay handle");
+      return;
+    }
     if (!amount || parseFloat(amount) <= 0) {
       Alert.alert("Error", "Please enter a valid amount");
       return;
@@ -57,10 +93,12 @@ export function PayScreen({ apiBaseUrl, userId, navigation, route }: Props) {
     // Navigate to dedicated PIN screen
     navigation.navigate('TransactionPin', {
       recipientHandle: handle,
+      recipientWallet: recipientWallet,
       inrAmount: parseFloat(amount),
       solAmount: quote?.sol
     });
   };
+
 
   if (!publicKey) return null;
 
@@ -77,14 +115,38 @@ export function PayScreen({ apiBaseUrl, userId, navigation, route }: Props) {
           <Text style={styles.headerTitle}>Send Money</Text>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           {/* Recipient Profile */}
           <View style={styles.recipientCard}>
             <View style={styles.avatar}>
-               <Text style={styles.avatarText}>{handle.substring(0, 2).toUpperCase()}</Text>
+               <Text style={styles.avatarText}>
+                {isResolving ? ".." : (handle && handle.length > 1 ? (handle.startsWith("@") ? handle.substring(1, 3) : handle.substring(0, 2)) : "?").toUpperCase()}
+               </Text>
+               {isVerified && (
+                 <View style={styles.verifiedBadge}>
+                   <LucideShieldCheck color="#000" size={12} />
+                 </View>
+               )}
             </View>
-            <Text style={styles.recipientName}>{handle}</Text>
-            <Text style={styles.recipientHandle}>Banking Name: SolUPI User</Text>
+            
+            <View style={styles.handleInputContainer}>
+              <TextInput
+                style={styles.handleInput}
+                value={handle}
+                onChangeText={setHandle}
+                placeholder="Enter VPA (e.g. alice)"
+                placeholderTextColor="#222"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {!handle.includes("@") && handle.length > 0 && (
+                <Text style={styles.vpaHint}>@monopay.app</Text>
+              )}
+            </View>
+
+            <Text style={[styles.recipientHandle, isVerified && { color: '#14F195' }]}>
+              {isResolving ? "Verifying handle..." : handle.length > 0 ? (isVerified ? `Verified: ${resolvedName}` : resolvedName) : "Enter a monopay handle to pay"}
+            </Text>
           </View>
 
           {/* Amount Input */}
@@ -128,7 +190,9 @@ export function PayScreen({ apiBaseUrl, userId, navigation, route }: Props) {
                 <LucideWallet color="#14F195" size={16} />
              </View>
              <View style={{ flex: 1 }}>
-                <Text style={styles.walletNameCompact}>Solana Account</Text>
+                <Text style={styles.walletNameCompact}>
+                  {allWallets.find((w: any) => w.address === publicKey.toBase58())?.handle || "Solana Account"}
+                </Text>
                 <Text style={styles.walletAddrCompact}>
                   {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)}
                 </Text>
@@ -166,7 +230,7 @@ export function PayScreen({ apiBaseUrl, userId, navigation, route }: Props) {
                   setShowWalletPicker(false);
                 }}
               >
-                <Text style={styles.walletLabel}>{w.label}</Text>
+                <Text style={styles.walletLabel}>{w.handle || w.label}</Text>
                 <Text style={styles.walletSubAddr}>{w.address.slice(0, 8)}...{w.address.slice(-8)}</Text>
               </TouchableOpacity>
             ))}
@@ -206,6 +270,38 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   avatarText: { color: '#14F195', fontSize: 24, fontWeight: '800' },
+  verifiedBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#14F195',
+    borderRadius: 8,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#000',
+  },
+  handleInputContainer: {
+    width: '100%',
+    marginVertical: 8,
+    alignItems: 'center',
+  },
+  handleInput: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: '800',
+    textAlign: 'center',
+    width: '100%',
+    padding: 8,
+  },
+  vpaHint: {
+    color: '#333',
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: -8,
+  },
   recipientName: { color: '#fff', fontSize: 24, fontWeight: '800' },
   recipientHandle: { color: '#666', fontSize: 14, marginTop: 4 },
   

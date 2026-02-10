@@ -6,7 +6,7 @@ import { validatePin } from '../features/pin/pinPolicy';
 
 const PinContext = createContext<PinState | undefined>(undefined);
 
-const PIN_HASH_KEY = 'solupi_pin_hash';
+const PIN_HASH_KEY = 'monopay_pin_hash';
 
 export function PinProvider({ children }: { children: ReactNode }) {
   const [isEnrolled, setIsEnrolled] = useState(false);

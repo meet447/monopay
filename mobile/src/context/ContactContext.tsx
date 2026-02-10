@@ -16,7 +16,7 @@ type ContactContextState = {
 
 const ContactContext = createContext<ContactContextState | undefined>(undefined);
 
-const CONTACTS_KEY = 'solupi_contacts';
+const CONTACTS_KEY = 'monopay_contacts';
 
 export function ContactProvider({ children }: { children: ReactNode }) {
   const [contacts, setContacts] = useState<Contact[]>([]);

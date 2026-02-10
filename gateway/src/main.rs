@@ -17,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "solupi_gateway=debug,tower_http=info".into()),
+                .unwrap_or_else(|_| "monopay_gateway=debug,tower_http=info".into()),
         )
         .init();
 
@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
         .context("invalid bind address")?;
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    info!("solupi-gateway listening on {}", listener.local_addr()?);
+    info!("monopay-gateway listening on {}", listener.local_addr()?);
     axum::serve(listener, router).await?;
 
     Ok(())

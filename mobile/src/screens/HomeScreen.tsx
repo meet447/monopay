@@ -54,7 +54,7 @@ export function HomeScreen({ navigation }: any) {
 
   const solanaPayUri = useMemo(() => {
     if (!publicKey) return "";
-    return `solana:${publicKey.toBase58()}?amount=${amount || 0}&label=SolUPI`;
+    return `solana:${publicKey.toBase58()}?amount=${amount || 0}&label=monopay`;
   }, [publicKey, amount]);
 
   const onScan = (data: string) => {
@@ -127,8 +127,9 @@ export function HomeScreen({ navigation }: any) {
           <LucideUsers color="#14F195" size={20} />
           <View style={{ marginLeft: 12 }}>
             <Text style={styles.greeting}>Active Account</Text>
-            <Text style={styles.walletAddr}>
-              {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)}
+            <Text style={styles.walletAddr} numberOfLines={1}>
+              {allWallets.find((w: any) => w.address === publicKey.toBase58())?.handle || 
+               `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`}
             </Text>
           </View>
         </TouchableOpacity>
@@ -255,7 +256,7 @@ export function HomeScreen({ navigation }: any) {
               <LucideX color="#666" size={24} />
             </TouchableOpacity>
             
-            <Text style={styles.modalTitle}>Your SolUPI QR</Text>
+            <Text style={styles.modalTitle}>Your monopay QR</Text>
             <Text style={styles.modalSubtitle}>Scan to pay securely on Solana</Text>
             
             <View style={styles.qrContainer}>
@@ -308,7 +309,7 @@ export function HomeScreen({ navigation }: any) {
                     setShowWalletModal(false);
                   }}
                 >
-                  <Text style={styles.walletLabel}>{w.label}</Text>
+                  <Text style={styles.walletLabel}>{w.handle || w.label}</Text>
                   <Text style={styles.walletSubAddr}>{w.address.slice(0, 8)}...{w.address.slice(-8)}</Text>
                 </TouchableOpacity>
               ))}

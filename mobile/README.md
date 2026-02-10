@@ -1,4 +1,4 @@
-# SolUPI Mobile Scaffold
+# monopay Mobile Scaffold
 
 This directory contains product-oriented TypeScript scaffolding for the React Native app.
 

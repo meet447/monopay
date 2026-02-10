@@ -48,7 +48,7 @@ export function PinEnrollScreen() {
       >
         <LucideShieldCheck size={64} color="#14F195" style={styles.heroIcon} />
         <Text style={styles.title}>
-          {step === 1 ? "Create SolUPI PIN" : "Confirm PIN"}
+          {step === 1 ? "Create monopay PIN" : "Confirm PIN"}
         </Text>
         <Text style={styles.subtitle}>
           {step === 1

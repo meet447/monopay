@@ -15,6 +15,7 @@ const DEVNET_RPC = "https://api.devnet.solana.com";
 
 export type PayInput = {
   recipientHandle: string; 
+  recipientWallet?: string;
   inrAmount: number;
   pin: string;
   senderKeypair: Keypair;
@@ -36,11 +37,27 @@ export async function runUpiLikePayFlow(client: ApiClient, input: PayInput): Pro
     
     // 1. Resolve Recipient
     let recipientPubkey: PublicKey;
-    if (input.recipientHandle.startsWith("@")) {
-      // Demo resolution
-      recipientPubkey = new PublicKey("7xKXbeUMB98UrSNo4Mw2s5at9tv9pTADsaW59N1m5Vn9");
+    
+    if (input.recipientWallet) {
+      // Use pre-resolved wallet if available
+      try {
+        recipientPubkey = new PublicKey(input.recipientWallet);
+      } catch (e) {
+        throw new Error(`Invalid pre-resolved wallet address: ${input.recipientWallet}`);
+      }
     } else {
-      recipientPubkey = new PublicKey(input.recipientHandle);
+      // Fallback to manual resolution if not pre-resolved
+      try {
+        const resolution = await client.resolveHandle(input.recipientHandle);
+        recipientPubkey = new PublicKey(resolution.wallet);
+      } catch (e) {
+        // If resolution fails, check if input is a valid public key string
+        try {
+          recipientPubkey = new PublicKey(input.recipientHandle);
+        } catch (keyError) {
+          throw new Error(`Could not resolve handle or address: ${input.recipientHandle}`);
+        }
+      }
     }
 
     // 2. Convert INR to SOL using real market rates

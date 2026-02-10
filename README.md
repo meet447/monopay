@@ -1,6 +1,6 @@
-# SolUPI
+# monopay
 
-SolUPI is a mobile-native Solana payments app inspired by UPI flows:
+monopay is a mobile-native Solana payments app inspired by UPI flows:
 - Scan and pay with QR
 - Request money via shareable links
 - Split bills with friends
@@ -18,10 +18,10 @@ Primary settlement assets: `USDC` and `SOL` on Solana.
 UPI-like payment in one flow:
 1. scan QR
 2. enter INR amount
-3. enter SolUPI PIN
+3. enter monopay PIN
 4. app converts INR to USDC and executes payment from selected wallet
 
-To avoid repeated wallet confirmation popups, SolUPI uses delegated signing/session authorization with strict spend limits and expiry.
+To avoid repeated wallet confirmation popups, monopay uses delegated signing/session authorization with strict spend limits and expiry.
 
 ## Repository Layout
 - `docs/architecture.md`: End-to-end system design

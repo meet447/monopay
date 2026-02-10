@@ -15,12 +15,13 @@ import { useWallet } from "../context/WalletContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { runUpiLikePayFlow } from "../features/pay/payController";
 import { ApiClient } from "../api/client";
+import { API_BASE_URL, DEMO_USER_ID } from "../config";
 
 const { width } = Dimensions.get("window");
 
 export function TransactionPinScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
-  const { recipientHandle, inrAmount, solAmount } = route.params;
+  const { recipientHandle, recipientWallet, inrAmount, solAmount } = route.params;
   const { verify } = usePin();
   const { getActiveKeypair, refreshBalance } = useWallet() as any;
   
@@ -28,7 +29,7 @@ export function TransactionPinScreen({ navigation, route }: any) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState("");
 
-  const client = new ApiClient({ baseUrl: "http://10.0.2.2:8080", userId: "usr_demo" });
+  const client = new ApiClient({ baseUrl: API_BASE_URL, userId: DEMO_USER_ID });
 
   const handleKeyPress = (val: string) => {
     if (pin.length < 6) {
@@ -57,7 +58,7 @@ export function TransactionPinScreen({ navigation, route }: any) {
     try {
       const isPinCorrect = await verify(pin);
       if (!isPinCorrect) {
-        Alert.alert("Error", "Incorrect Sol PIN");
+        Alert.alert("Error", "Incorrect monopay PIN");
         setPin("");
         setIsProcessing(false);
         return;
@@ -69,10 +70,12 @@ export function TransactionPinScreen({ navigation, route }: any) {
 
       const result = await runUpiLikePayFlow(client, {
         recipientHandle,
+        recipientWallet,
         inrAmount,
         pin,
         senderKeypair: keypair,
       });
+
 
       if (result.ok) {
         await refreshBalance();
@@ -110,7 +113,7 @@ export function TransactionPinScreen({ navigation, route }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <LucideChevronLeft color="#fff" size={24} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>ENTER SOL PIN</Text>
+        <Text style={styles.headerTitle}>ENTER monopay PIN</Text>
       </View>
 
       <View style={styles.content}>
@@ -153,7 +156,7 @@ export function TransactionPinScreen({ navigation, route }: any) {
 
       <View style={styles.footer}>
          <LucideShieldCheck color="#666" size={16} />
-         <Text style={styles.footerText}>Securely signed by SolUPI</Text>
+         <Text style={styles.footerText}>Securely signed by monopay</Text>
       </View>
     </View>
   );

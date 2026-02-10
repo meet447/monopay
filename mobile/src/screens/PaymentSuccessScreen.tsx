@@ -35,7 +35,7 @@ export function PaymentSuccessScreen({ navigation, route }: any) {
 
   const onShare = async () => {
     try {
-      const message = `Payment Successful!\n\nSent: ₹${inrAmount}\nTo: ${recipientHandle}\nVia: SolUPI\n\nTransaction ID: ${signature}\nView details: https://explorer.solana.com/tx/${signature}?cluster=devnet`;
+      const message = `Payment Successful!\n\nSent: ₹${inrAmount}\nTo: ${recipientHandle}\nVia: monopay\n\nTransaction ID: ${signature}\nView details: https://explorer.solana.com/tx/${signature}?cluster=devnet`;
       
       await Share.share({
         message,
@@ -72,7 +72,7 @@ export function PaymentSuccessScreen({ navigation, route }: any) {
           <Text style={styles.infoLabel}>Platform</Text>
           <View style={styles.platformBadge}>
              <LucideZap size={12} color="#14F195" />
-             <Text style={styles.platformText}>SolUPI</Text>
+             <Text style={styles.platformText}>monopay</Text>
           </View>
         </View>
       </View>

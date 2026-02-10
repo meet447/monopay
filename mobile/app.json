@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "SolUPI",
-    "slug": "solupi-mobile",
+    "name": "monopay",
+    "slug": "monopay-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,14 +14,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.maouu44.solupimobile"
+      "bundleIdentifier": "com.monopay.mobile"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.maouu44.solupimobile"
+      "package": "com.monopay.mobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"

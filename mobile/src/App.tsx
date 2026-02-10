@@ -12,10 +12,9 @@ import { PayScreen } from "./screens/PayScreen";
 import { TransactionPinScreen } from "./screens/TransactionPinScreen";
 import { PaymentSuccessScreen } from "./screens/PaymentSuccessScreen";
 
-const Stack = createNativeStackNavigator();
+import { API_BASE_URL, DEMO_USER_ID } from "./config";
 
-const API_BASE_URL = "http://10.0.2.2:8080";
-const DEMO_USER_ID = "usr_demo";
+const Stack = createNativeStackNavigator();
 
 function RootStack() {
   const { publicKey, isLoading: walletLoading } = useWallet() as any;

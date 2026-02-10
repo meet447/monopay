@@ -2,7 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Keypair } from '@solana/web3.js';
 import { Buffer } from 'buffer';
 
-const SESSION_KEY_NAME = 'solupi_session_key';
+const SESSION_KEY_NAME = 'monopay_session_key';
 
 export const SessionManager = {
   /**
