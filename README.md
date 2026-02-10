@@ -39,4 +39,40 @@ To avoid repeated wallet confirmation popups, SolUPI uses delegated signing/sess
 4. Add optional NFC and notification polish.
 
 See the docs folder for implementation details.
+
+## Getting Started
+
+### Prerequisites
+- [Node.js](https://nodejs.org/) (v18 or newer)
+- [Expo Go](https://expo.dev/expo-go) app on your physical device (iOS/Android)
+- (Optional) [Rust](https://www.rust-lang.org/) for running the gateway
+
+### Mobile App Setup
+1. Navigate to the mobile directory:
+   ```bash
+   cd mobile
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the Expo development server:
+   ```bash
+   npm start
+   ```
+4. Scan the QR code with your Expo Go app or use the keyboard shortcuts:
+   - `a` to run on Android emulator
+   - `i` to run on iOS simulator
+   - `w` to run on web
+
+### Gateway Setup (Optional)
+1. Navigate to the gateway directory:
+   ```bash
+   cd gateway
+   ```
+2. Run the server:
+   ```bash
+   cargo run
+   ```
+
 # monopay
