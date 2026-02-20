@@ -1,71 +1,136 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  Easing,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  ScrollView,
-  Dimensions,
-  Alert,
+  View,
 } from "react-native";
-import { 
-  LucideZap, 
-  LucideScan, 
-  LucideArrowUpRight, 
-  LucideArrowDownLeft, 
-  LucideSettings,
+import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
+import {
+  LucideArrowDownLeft,
+  LucideArrowUpRight,
   LucideCopy,
-  LucideX,
+  LucideScan,
+  LucideSettings,
   LucideUsers,
+  LucideWallet,
+  LucideX,
+  LucideZap,
 } from "lucide-react-native";
-import QRCode from 'react-native-qrcode-svg';
-import * as Clipboard from 'expo-clipboard';
+import QRCode from "react-native-qrcode-svg";
+import * as Clipboard from "expo-clipboard";
+import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useWallet } from "../context/WalletContext";
 import { useContacts } from "../context/ContactContext";
 import { QRScanner } from "../components/QRScanner";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { PriceService } from "../utils/prices";
+import { PremiumBackground } from "../components/PremiumBackground";
+import { GlassCard } from "../components/GlassCard";
+import { ScalePressable } from "../components/ScalePressable";
+import { premiumColors } from "../theme/premium";
 
-const { width } = Dimensions.get('window');
+const sheetStart = Dimensions.get("window").height;
 
 export function HomeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { 
-    publicKey, 
-    disconnect, 
-    allWallets, 
-    switchWallet, 
-    balance, 
-    solPrice, 
+  const {
+    publicKey,
+    disconnect,
+    allWallets,
+    switchWallet,
+    balance,
+    solPrice,
     refreshBalance,
     transactions,
-    isLoadingTransactions
+    isLoadingTransactions,
   } = useWallet() as any;
   const { frequentPayees, getContactName } = useContacts();
 
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
-
   const [amount, setAmount] = useState("");
+
+  const screenAnim = useMemo(() => new Animated.Value(0), []);
+  const slideAnimReceive = useMemo(() => new Animated.Value(sheetStart), []);
+  const slideAnimWallet = useMemo(() => new Animated.Value(sheetStart), []);
+
+  useEffect(() => {
+    Animated.timing(screenAnim, {
+      toValue: 1,
+      duration: 580,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [screenAnim]);
+
+  const activeWallet = useMemo(
+    () => allWallets.find((wallet: any) => wallet.address === publicKey?.toBase58()),
+    [allWallets, publicKey]
+  );
 
   const solanaPayUri = useMemo(() => {
     if (!publicKey) return "";
     return `solana:${publicKey.toBase58()}?amount=${amount || 0}&label=monopay`;
   }, [publicKey, amount]);
 
+  const openModal = (type: "receive" | "wallet") => {
+    if (type === "receive") {
+      setShowReceiveModal(true);
+      Animated.timing(slideAnimReceive, {
+        toValue: 0,
+        duration: 340,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+
+    setShowWalletModal(true);
+    Animated.timing(slideAnimWallet, {
+      toValue: 0,
+      duration: 340,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeModal = (type: "receive" | "wallet") => {
+    if (type === "receive") {
+      Animated.timing(slideAnimReceive, {
+        toValue: sheetStart,
+        duration: 240,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start(() => setShowReceiveModal(false));
+      return;
+    }
+
+    Animated.timing(slideAnimWallet, {
+      toValue: sheetStart,
+      duration: 240,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => setShowWalletModal(false));
+  };
+
   const onScan = (data: string) => {
     setIsScannerVisible(false);
-    navigation.navigate('Pay', { qrData: data });
+    navigation.navigate("Pay", { qrData: data });
   };
 
   const copyAddress = async () => {
     if (!publicKey) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await Clipboard.setStringAsync(publicKey.toBase58());
-    Alert.alert("Success", "Address copied to clipboard");
+    Alert.alert("Copied", "Address copied to clipboard.");
   };
 
   const requestAirdrop = async () => {
@@ -75,400 +140,654 @@ export function HomeScreen({ navigation }: any) {
       const signature = await connection.requestAirdrop(publicKey, LAMPORTS_PER_SOL);
       await connection.confirmTransaction(signature);
       await refreshBalance();
-      Alert.alert("Success", "1 SOL dropped into your account!");
-    } catch (e: any) {
+      Alert.alert("Success", "1 SOL dropped into your account.");
+    } catch (e) {
       Alert.alert(
-        "Faucet Busy", 
-        "Solana's public faucet is currently rate-limited. \n\nPlease use: https://faucet.solana.com/ (Select Devnet) \n\nAddress copied to clipboard!",
-        [{ text: "Copy Address & Close", onPress: async () => {
-           await Clipboard.setStringAsync(publicKey.toBase58());
-        }}]
+        "Faucet Busy",
+        "The public Solana faucet is rate-limited. Use https://faucet.solana.com (Devnet). Address copied.",
+        [
+          {
+            text: "OK",
+            onPress: async () => {
+              if (publicKey) {
+                await Clipboard.setStringAsync(publicKey.toBase58());
+              }
+            },
+          },
+        ]
       );
     }
   };
 
   const formatTx = (tx: any) => {
-    const time = tx.time ? new Date(tx.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Pending';
-    const date = tx.time ? new Date(tx.time * 1000).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
-    
+    const time = tx.time
+      ? new Date(tx.time * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      : "Pending";
+    const date = tx.time
+      ? new Date(tx.time * 1000).toLocaleDateString([], { month: "short", day: "numeric" })
+      : "";
+
     const instructions = tx.details?.transaction?.message?.instructions;
-    const transferIx = instructions?.find((ix: any) => ix.program === 'system' && ix.parsed?.type === 'transfer');
-    
+    const transferIx = instructions?.find(
+      (ix: any) => ix.program === "system" && ix.parsed?.type === "transfer"
+    );
+
     if (transferIx) {
       const info = transferIx.parsed.info;
       const isSent = info.source === publicKey.toBase58();
       const amountSol = info.lamports / LAMPORTS_PER_SOL;
-      const amountInr = (amountSol * solPrice).toLocaleString(undefined, { maximumFractionDigits: 0 });
-      
+      const amountInr = (amountSol * solPrice).toLocaleString(undefined, {
+        maximumFractionDigits: 0,
+      });
+
       return {
-        label: isSent ? `Sent to ${getContactName(info.destination)}` : `Received from ${getContactName(info.source)}`,
+        label: isSent
+          ? `Sent to ${getContactName(info.destination)}`
+          : `Received from ${getContactName(info.source)}`,
         subLabel: `${date}, ${time}`,
-        amount: `${isSent ? '-' : '+'} ₹${amountInr}`,
+        amount: `${isSent ? "-" : "+"} ₹${amountInr}`,
         isSent,
-        sol: `${amountSol.toFixed(4)} SOL`
+        sol: `${amountSol.toFixed(4)} SOL`,
       };
     }
-    
+
     return {
-      label: 'Other Transaction',
+      label: "Other Transaction",
       subLabel: `${date}, ${time}`,
-      amount: '---',
+      amount: "---",
       isSent: false,
-      sol: tx.signature.slice(0, 8) + '...'
+      sol: tx.signature.slice(0, 8) + "...",
     };
   };
 
   if (!publicKey) return null;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => setShowWalletModal(true)} style={styles.walletSelector}>
-          <LucideUsers color="#14F195" size={20} />
-          <View style={{ marginLeft: 12 }}>
-            <Text style={styles.greeting}>Active Account</Text>
-            <Text style={styles.walletAddr} numberOfLines={1}>
-              {allWallets.find((w: any) => w.address === publicKey.toBase58())?.handle || 
-               `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`}
-            </Text>
-          </View>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={disconnect} style={styles.settingsBtn}>
-          <LucideSettings color="#666" size={24} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Balance Card */}
-        <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Total Balance</Text>
-          <Text style={styles.balanceAmount}>
-            {balance !== null ? `₹${(balance * solPrice).toLocaleString(undefined, {maximumFractionDigits: 2})}` : '₹0.00'}
-          </Text>
-          <View style={styles.balanceFooter}>
-            <Text style={styles.balanceSub}>
-              {balance !== null ? `${balance.toFixed(4)} SOL` : '0.00 SOL'}
-            </Text>
-            {balance === 0 && (
-              <TouchableOpacity onPress={requestAirdrop}>
-                <Text style={{ color: '#14F195', fontSize: 12, fontWeight: '700' }}>
-                  Request Test SOL
+    <PremiumBackground>
+      <View style={[styles.container, { paddingTop: insets.top + 6 }]}>
+        <Animated.View
+          style={[
+            styles.container,
+            {
+              opacity: screenAnim,
+              transform: [
+                {
+                  translateY: screenAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [22, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View style={styles.header}>
+            <ScalePressable style={styles.walletSelector} onPress={() => openModal("wallet")} haptic="light">
+              <View style={styles.walletIconWrap}>
+                <LucideWallet color={premiumColors.accent} size={18} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.greeting}>Active Account</Text>
+                <Text style={styles.walletAddr} numberOfLines={1}>
+                  {activeWallet?.handle || `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`}
                 </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
+              </View>
+              <LucideUsers color={premiumColors.textSecondary} size={18} />
+            </ScalePressable>
 
-        {/* Quick Contacts */}
-        {frequentPayees.length > 0 && (
-          <View style={styles.contactsSection}>
-            <Text style={styles.sectionTitleSmall}>Quick Pay</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.contactsScroll}>
-              {frequentPayees.map(contact => (
-                <TouchableOpacity 
-                  key={contact.address} 
-                  style={styles.contactItem}
-                  onPress={() => navigation.navigate('Pay', { qrData: contact.address })}
-                >
-                  <View style={styles.contactAvatar}>
-                    <Text style={styles.contactAvatarText}>{contact.name.substring(0, 1).toUpperCase()}</Text>
-                  </View>
-                  <Text style={styles.contactName} numberOfLines={1}>{contact.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <TouchableOpacity 
-            style={styles.actionItem} 
-            onPress={() => setIsScannerVisible(true)}
-          >
-            <View style={[styles.iconCircle, { backgroundColor: '#14F195' }]}>
-              <LucideScan color="#000" size={28} />
-            </View>
-            <Text style={styles.actionText}>Scan & Pay</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.actionItem}
-            onPress={() => setShowReceiveModal(true)}
-          >
-            <View style={[styles.iconCircle, { backgroundColor: '#333' }]}>
-              <LucideArrowDownLeft color="#14F195" size={28} />
-            </View>
-            <Text style={styles.actionText}>Receive</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.actionItem}
-            onPress={() => navigation.navigate('Pay')}
-          >
-            <View style={[styles.iconCircle, { backgroundColor: '#333' }]}>
-              <LucideArrowUpRight color="#fff" size={28} />
-            </View>
-            <Text style={styles.actionText}>To Handle</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Recent Activity */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          {isLoadingTransactions && transactions.length === 0 ? (
-            <ActivityIndicator color="#14F195" style={{ marginTop: 20 }} />
-          ) : transactions.length === 0 ? (
-            <Text style={{ color: '#444', textAlign: 'center', marginTop: 20 }}>No transactions yet</Text>
-          ) : (
-            transactions.map((tx) => {
-              const formatted = formatTx(tx);
-              return (
-                <View key={tx.signature} style={styles.activityItem}>
-                  <View style={styles.activityIcon}>
-                    <LucideZap color={formatted.isSent ? "#ff4d4d" : "#14F195"} size={20} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.activityName}>{formatted.label}</Text>
-                    <Text style={styles.activityDate}>{formatted.subLabel}</Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={[styles.activityAmount, { color: formatted.isSent ? "#fff" : "#14F195" }]}>
-                      {formatted.amount}
-                    </Text>
-                    <Text style={{ color: '#444', fontSize: 10 }}>{formatted.sol}</Text>
-                  </View>
-                </View>
-              );
-            })
-          )}
-        </View>
-      </ScrollView>
-
-      {/* Receive Modal */}
-      {showReceiveModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity 
-              style={styles.closeModal} 
-              onPress={() => setShowReceiveModal(false)}
+            <ScalePressable
+              onPress={() => disconnect()}
+              style={styles.settingsBtn}
+              haptic="light"
             >
-              <LucideX color="#666" size={24} />
-            </TouchableOpacity>
-            
-            <Text style={styles.modalTitle}>Your monopay QR</Text>
-            <Text style={styles.modalSubtitle}>Scan to pay securely on Solana</Text>
-            
-            <View style={styles.qrContainer}>
-              <QRCode
-                value={solanaPayUri}
-                size={200}
-                color="black"
-                backgroundColor="white"
-              />
+              <LucideSettings color={premiumColors.textSecondary} size={20} />
+            </ScalePressable>
+          </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 140 }]}
+          >
+            <LinearGradient
+              colors={["rgba(213, 104, 64, 0.25)", "rgba(224, 120, 80, 0.08)", "rgba(255,255,255,0.04)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.balanceCard}
+            >
+              <Text style={styles.balanceLabel}>Available Balance</Text>
+              <Text style={styles.balanceAmount}>
+                {balance !== null
+                  ? `₹${(balance * solPrice).toLocaleString(undefined, {
+                    maximumFractionDigits: 2,
+                  })}`
+                  : "₹0.00"}
+              </Text>
+              <View style={styles.balanceFooter}>
+                <Text style={styles.balanceSub}>{balance !== null ? `${balance.toFixed(4)} SOL` : "0.0000 SOL"}</Text>
+                {balance === 0 ? (
+                  <ScalePressable onPress={requestAirdrop} haptic="light">
+                    <Text style={styles.balanceLink}>Request Test SOL</Text>
+                  </ScalePressable>
+                ) : null}
+              </View>
+            </LinearGradient>
+
+            {frequentPayees.length > 0 ? (
+              <View style={styles.contactsSection}>
+                <Text style={styles.sectionLabel}>Quick Pay</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.contactsScroll}
+                >
+                  {frequentPayees.map((contact) => (
+                    <ScalePressable
+                      key={contact.address}
+                      style={styles.contactItem}
+                      onPress={() => navigation.navigate("Pay", { qrData: contact.address })}
+                      haptic="light"
+                    >
+                      <View style={styles.contactAvatar}>
+                        <Text style={styles.contactAvatarText}>{contact.name.substring(0, 1).toUpperCase()}</Text>
+                      </View>
+                      <Text style={styles.contactName} numberOfLines={1}>
+                        {contact.name}
+                      </Text>
+                    </ScalePressable>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
+
+            <View style={styles.quickActions}>
+              <ScalePressable
+                style={styles.actionItem}
+                onPress={() => setIsScannerVisible(true)}
+                haptic="medium"
+              >
+                <View style={[styles.iconCircle, styles.iconPrimary]}>
+                  <LucideScan color={premiumColors.darkText} size={24} />
+                </View>
+                <Text style={styles.actionText}>Scan</Text>
+              </ScalePressable>
+
+              <ScalePressable style={styles.actionItem} onPress={() => openModal("receive")} haptic="light">
+                <View style={styles.iconCircle}>
+                  <LucideArrowDownLeft color={premiumColors.accent} size={24} />
+                </View>
+                <Text style={styles.actionText}>Receive</Text>
+              </ScalePressable>
+
+              <ScalePressable
+                style={styles.actionItem}
+                onPress={() => navigation.navigate("Pay")}
+                haptic="light"
+              >
+                <View style={styles.iconCircle}>
+                  <LucideArrowUpRight color={premiumColors.textPrimary} size={24} />
+                </View>
+                <Text style={styles.actionText}>Send</Text>
+              </ScalePressable>
             </View>
 
-            <View style={styles.amountToggle}>
-               <TextInput
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Recent Activity</Text>
+              {isLoadingTransactions && transactions.length === 0 ? (
+                <ActivityIndicator color={premiumColors.accent} style={{ marginTop: 20 }} />
+              ) : transactions.length === 0 ? (
+                <Text style={styles.emptyText}>No transactions yet.</Text>
+              ) : (
+                transactions.map((tx: any) => {
+                  const formatted = formatTx(tx);
+                  return (
+                    <GlassCard key={tx.signature} style={styles.activityItem}>
+                      <View style={styles.activityIcon}>
+                        <LucideZap
+                          color={formatted.isSent ? premiumColors.danger : premiumColors.success}
+                          size={16}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.activityName}>{formatted.label}</Text>
+                        <Text style={styles.activityDate}>{formatted.subLabel}</Text>
+                      </View>
+                      <View style={styles.activityRight}>
+                        <Text
+                          style={[
+                            styles.activityAmount,
+                            { color: formatted.isSent ? premiumColors.textPrimary : premiumColors.accent },
+                          ]}
+                        >
+                          {formatted.amount}
+                        </Text>
+                        <Text style={styles.activitySol}>{formatted.sol}</Text>
+                      </View>
+                    </GlassCard>
+                  );
+                })
+              )}
+            </View>
+          </ScrollView>
+        </Animated.View>
+
+        {showReceiveModal ? (
+          <View style={styles.modalOverlay}>
+            <ScalePressable style={styles.modalBackdrop} onPress={() => closeModal("receive")} />
+            <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnimReceive }] }]}>
+              <ScalePressable style={styles.closeModal} onPress={() => closeModal("receive")} haptic="light">
+                <LucideX color={premiumColors.textSecondary} size={22} />
+              </ScalePressable>
+
+              <Text style={styles.modalTitle}>Receive with QR</Text>
+              <Text style={styles.modalSubtitle}>Share this code to receive payment securely.</Text>
+
+              <View style={styles.qrContainer}>
+                <QRCode value={solanaPayUri} size={190} color="#102032" backgroundColor="#FFFFFF" />
+              </View>
+
+              <View style={styles.amountToggle}>
+                <TextInput
                   style={styles.amountInput}
-                  placeholder="Set Amount (optional)"
-                  placeholderTextColor="#666"
+                  placeholder="Set amount (optional)"
+                  placeholderTextColor={premiumColors.textMuted}
                   keyboardType="numeric"
                   value={amount}
                   onChangeText={setAmount}
-               />
-               <Text style={styles.amountCurrency}>INR</Text>
-            </View>
+                />
+                <Text style={styles.amountCurrency}>INR</Text>
+              </View>
 
-            <TouchableOpacity style={styles.copyButton} onPress={copyAddress}>
-              <LucideCopy color="#14F195" size={18} />
-              <Text style={styles.copyText}>Copy Address</Text>
-            </TouchableOpacity>
+              <ScalePressable style={styles.copyButton} onPress={copyAddress} haptic="light">
+                <LucideCopy color={premiumColors.accent} size={16} />
+                <Text style={styles.copyText}>Copy Address</Text>
+              </ScalePressable>
+            </Animated.View>
           </View>
-        </View>
-      )}
+        ) : null}
 
-      {/* Wallet Switcher Modal */}
-      {showWalletModal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity style={styles.closeModal} onPress={() => setShowWalletModal(false)}>
-              <LucideX color="#000" size={24} />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Switch Account</Text>
-            <ScrollView style={{ width: '100%', maxHeight: 300 }}>
-              {allWallets.map((w: any) => (
-                <TouchableOpacity 
-                  key={w.address} 
-                  style={[
-                    styles.walletItem,
-                    publicKey.toBase58() === w.address && styles.activeWalletItem
-                  ]}
-                  onPress={() => {
-                    switchWallet(w.address);
-                    setShowWalletModal(false);
-                  }}
-                >
-                  <Text style={styles.walletLabel}>{w.handle || w.label}</Text>
-                  <Text style={styles.walletSubAddr}>{w.address.slice(0, 8)}...{w.address.slice(-8)}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity 
-              style={styles.addWalletBtn}
-              onPress={() => {
-                setShowWalletModal(false);
-                disconnect(); 
-              }}
-            >
-              <Text style={styles.addWalletText}>+ Link New Account</Text>
-            </TouchableOpacity>
+        {showWalletModal ? (
+          <View style={styles.modalOverlay}>
+            <ScalePressable style={styles.modalBackdrop} onPress={() => closeModal("wallet")} />
+            <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnimWallet }] }]}>
+              <ScalePressable style={styles.closeModal} onPress={() => closeModal("wallet")} haptic="light">
+                <LucideX color={premiumColors.textSecondary} size={22} />
+              </ScalePressable>
+
+              <Text style={styles.modalTitle}>Switch Account</Text>
+              <ScrollView style={styles.walletList} showsVerticalScrollIndicator={false}>
+                {allWallets.map((wallet: any) => (
+                  <ScalePressable
+                    key={wallet.address}
+                    style={[
+                      styles.walletItem,
+                      publicKey.toBase58() === wallet.address && styles.activeWalletItem,
+                    ]}
+                    onPress={() => {
+                      switchWallet(wallet.address);
+                      closeModal("wallet");
+                    }}
+                    haptic="medium"
+                  >
+                    <Text style={styles.walletLabel}>{wallet.handle || wallet.label}</Text>
+                    <Text style={styles.walletSubAddr}>
+                      {wallet.address.slice(0, 8)}...{wallet.address.slice(-8)}
+                    </Text>
+                  </ScalePressable>
+                ))}
+              </ScrollView>
+
+              <ScalePressable
+                style={styles.addWalletBtn}
+                onPress={() => {
+                  closeModal("wallet");
+                  setTimeout(() => disconnect(), 260);
+                }}
+                haptic="light"
+              >
+                <Text style={styles.addWalletText}>+ Link New Account</Text>
+              </ScalePressable>
+            </Animated.View>
           </View>
-        </View>
-      )}
+        ) : null}
 
-      <QRScanner 
-        visible={isScannerVisible} 
-        onClose={() => setIsScannerVisible(false)} 
-        onScan={onScan} 
-      />
-    </View>
+        <QRScanner visible={isScannerVisible} onClose={() => setIsScannerVisible(false)} onScan={onScan} />
+      </View>
+    </PremiumBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  contactsSection: { marginBottom: 32 },
-  sectionTitleSmall: { color: "#666", fontSize: 13, fontWeight: "700", marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 },
-  contactsScroll: { gap: 20 },
-  contactItem: { alignItems: 'center', width: 64 },
-  contactAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#111',
-    borderWidth: 1,
-    borderColor: '#222',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
+  container: {
+    flex: 1,
   },
-  contactAvatarText: { color: '#14F195', fontSize: 20, fontWeight: '700' },
-  contactName: { color: '#999', fontSize: 12, textAlign: 'center' },
-  container: { flex: 1, backgroundColor: "#000" },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
   walletSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#111',
-    padding: 12,
+    flex: 1,
+    marginRight: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    backgroundColor: premiumColors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  walletIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(224, 120, 80, 0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  greeting: {
+    color: premiumColors.textMuted,
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  walletAddr: {
+    color: premiumColors.textPrimary,
+    fontSize: 15,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  settingsBtn: {
+    width: 46,
+    height: 46,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#222',
-    flex: 1,
-    marginRight: 16,
+    borderColor: premiumColors.border,
+    backgroundColor: premiumColors.surface,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  walletItem: {
-    padding: 16,
-    borderRadius: 12,
+  scrollContent: {
+    paddingHorizontal: 20,
+    gap: 24,
+  },
+  balanceCard: {
+    borderRadius: 28,
+    padding: 22,
     borderWidth: 1,
-    borderColor: '#eee',
-    marginBottom: 12,
-    width: '100%',
+    borderColor: premiumColors.border,
+    overflow: "hidden",
   },
-  activeWalletItem: {
-    borderColor: '#14F195',
-    backgroundColor: '#f0fff4',
+  balanceLabel: {
+    color: premiumColors.textSecondary,
+    fontSize: 14,
+    marginBottom: 8,
   },
-  walletLabel: { fontWeight: '700', color: '#000', fontSize: 16 },
-  walletSubAddr: { color: '#666', fontSize: 12, marginTop: 4 },
-  addWalletBtn: { marginTop: 16, padding: 12 },
-  addWalletText: { color: '#14F195', fontWeight: '700' },
-  header: {
+  balanceAmount: {
+    color: premiumColors.textPrimary,
+    fontSize: 38,
+    fontWeight: "800",
+    letterSpacing: -0.7,
+  },
+  balanceFooter: {
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: premiumColors.borderSoft,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 24,
-    paddingTop: 12,
   },
-  greeting: { color: "#666", fontSize: 12 },
-  walletAddr: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  settingsBtn: { backgroundColor: "#111", padding: 10, borderRadius: 12 },
-  scrollContent: { padding: 24, paddingTop: 0 },
-  balanceCard: {
-    backgroundColor: "#111",
-    padding: 24,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "#222",
-    marginBottom: 32,
+  balanceSub: {
+    color: premiumColors.accent,
+    fontWeight: "700",
+    fontSize: 14,
   },
-  balanceLabel: { color: "#666", fontSize: 14, marginBottom: 8 },
-  balanceAmount: { color: "#fff", fontSize: 36, fontWeight: "900" },
-  balanceFooter: { 
-    marginTop: 12, 
-    paddingTop: 12, 
-    borderTopWidth: 1, 
-    borderTopColor: "#222",
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  balanceLink: {
+    color: premiumColors.textPrimary,
+    fontSize: 12,
+    fontWeight: "700",
   },
-  balanceSub: { color: "#14F195", fontWeight: "600" },
-  quickActions: { flexDirection: "row", justifyContent: "space-between", marginBottom: 40 },
-  actionItem: { alignItems: "center", gap: 10 },
-  iconCircle: { width: 64, height: 64, borderRadius: 32, justifyContent: "center", alignItems: "center" },
-  actionText: { color: "#fff", fontSize: 13, fontWeight: "600" },
-  section: { gap: 16 },
-  sectionTitle: { color: "#fff", fontSize: 20, fontWeight: "800", marginBottom: 8 },
-  activityItem: {
-    flexDirection: "row",
+  contactsSection: {},
+  sectionLabel: {
+    color: premiumColors.textSecondary,
+    fontSize: 13,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.9,
+    marginBottom: 12,
+  },
+  contactsScroll: {
+    gap: 14,
+    paddingRight: 12,
+  },
+  contactItem: {
+    width: 72,
     alignItems: "center",
-    backgroundColor: "#080808",
-    padding: 16,
-    borderRadius: 16,
-    gap: 16,
   },
-  activityIcon: { backgroundColor: "#111", padding: 10, borderRadius: 12 },
-  activityName: { color: "#fff", fontWeight: "600", fontSize: 15 },
-  activityDate: { color: "#444", fontSize: 12 },
-  activityAmount: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  
-  // Modal
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.85)",
+  contactAvatar: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 1,
+    borderColor: premiumColors.border,
+    backgroundColor: premiumColors.surface,
     justifyContent: "center",
     alignItems: "center",
-    padding: 24,
-    zIndex: 1000,
+    marginBottom: 8,
   },
-  modalContent: {
-    backgroundColor: "#fff",
-    width: "100%",
-    borderRadius: 32,
-    padding: 32,
-    alignItems: "center",
+  contactAvatarText: {
+    color: premiumColors.accent,
+    fontSize: 20,
+    fontWeight: "700",
   },
-  closeModal: { position: "absolute", top: 20, right: 20 },
-  modalTitle: { fontSize: 24, fontWeight: "800", color: "#000", marginBottom: 8 },
-  modalSubtitle: { fontSize: 14, color: "#666", marginBottom: 32 },
-  qrContainer: {
-    padding: 16,
-    backgroundColor: "#fff",
-    borderRadius: 24,
+  contactName: {
+    color: premiumColors.textSecondary,
+    fontSize: 12,
+  },
+  quickActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  actionItem: {
+    flex: 1,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#eee",
-    marginBottom: 24,
+    borderColor: premiumColors.borderSoft,
+    backgroundColor: premiumColors.surface,
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  amountToggle: {
+  iconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  iconPrimary: {
+    backgroundColor: premiumColors.accent,
+  },
+  actionText: {
+    color: premiumColors.textPrimary,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  section: {
+    gap: 12,
+  },
+  sectionTitle: {
+    color: premiumColors.textPrimary,
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  emptyText: {
+    color: premiumColors.textMuted,
+    textAlign: "center",
+    marginTop: 16,
+  },
+  activityItem: {
+    borderRadius: 20,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f5f5f5",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    marginBottom: 24,
+    gap: 10,
   },
-  amountInput: { flex: 1, padding: 12, fontSize: 16, color: "#000" },
-  amountCurrency: { fontWeight: "700", color: "#999" },
-  copyButton: { flexDirection: "row", alignItems: "center", gap: 8 },
-  copyText: { color: "#000", fontWeight: "600" },
+  activityIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  activityName: {
+    color: premiumColors.textPrimary,
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  activityDate: {
+    color: premiumColors.textMuted,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  activityRight: {
+    alignItems: "flex-end",
+  },
+  activityAmount: {
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  activitySol: {
+    color: premiumColors.textMuted,
+    fontSize: 10,
+    marginTop: 2,
+  },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "flex-end",
+    zIndex: 20,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(4, 10, 20, 0.76)",
+  },
+  modalContent: {
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    borderWidth: 1,
+    borderColor: premiumColors.borderSoft,
+    backgroundColor: "rgba(8, 22, 39, 0.98)",
+    paddingHorizontal: 22,
+    paddingTop: 20,
+    paddingBottom: 28,
+    alignItems: "center",
+  },
+  closeModal: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  modalTitle: {
+    color: premiumColors.textPrimary,
+    fontSize: 24,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  modalSubtitle: {
+    color: premiumColors.textSecondary,
+    fontSize: 14,
+    marginBottom: 20,
+  },
+  qrContainer: {
+    borderRadius: 24,
+    backgroundColor: "#FFFFFF",
+    padding: 14,
+    marginBottom: 16,
+  },
+  amountToggle: {
+    width: "100%",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: premiumColors.borderSoft,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  amountInput: {
+    flex: 1,
+    color: premiumColors.textPrimary,
+    fontSize: 15,
+    paddingVertical: 12,
+  },
+  amountCurrency: {
+    color: premiumColors.textSecondary,
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  copyButton: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+  },
+  copyText: {
+    color: premiumColors.textPrimary,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  walletList: {
+    width: "100%",
+    maxHeight: 300,
+    marginTop: 12,
+  },
+  walletItem: {
+    width: "100%",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: premiumColors.borderSoft,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    marginBottom: 10,
+  },
+  activeWalletItem: {
+    borderColor: premiumColors.accent,
+    backgroundColor: "rgba(224, 120, 80, 0.14)",
+  },
+  walletLabel: {
+    color: premiumColors.textPrimary,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  walletSubAddr: {
+    color: premiumColors.textSecondary,
+    fontSize: 12,
+    marginTop: 3,
+  },
+  addWalletBtn: {
+    marginTop: 8,
+    paddingVertical: 10,
+  },
+  addWalletText: {
+    color: premiumColors.accent,
+    fontSize: 14,
+    fontWeight: "700",
+  },
 });
