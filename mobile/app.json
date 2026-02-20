@@ -21,7 +21,10 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.monopay.mobile"
+      "package": "com.monopay.mobile",
+      "permissions": [
+        "android.permission.NFC"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
