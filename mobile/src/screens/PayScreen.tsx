@@ -11,6 +11,8 @@ import {
   KeyboardAvoidingView,
   ScrollView,
 } from "react-native";
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { LucideWallet, LucideZap, LucideShieldCheck, LucideScanQrCode, LucideInfo, LucideChevronLeft, LucideChevronDown, LucideX } from "lucide-react-native";
 import { useWallet } from "../context/WalletContext";
 import { usePin } from "../context/PinContext";
@@ -31,7 +33,7 @@ type Props = {
 export function PayScreen({ apiBaseUrl, userId, navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { publicKey, allWallets, switchWallet, isLoading: isConnecting } = useWallet() as any;
-  
+
   const [handle, setHandle] = useState(route?.params?.qrData || "");
   const [resolvedName, setResolvedName] = useState("");
   const [recipientWallet, setRecipientWallet] = useState<string | null>(null);
@@ -73,7 +75,7 @@ export function PayScreen({ apiBaseUrl, userId, navigation, route }: Props) {
     if (route?.params?.qrData) {
       let resolvedHandle = route.params.qrData;
       if (resolvedHandle.startsWith("solana:")) {
-         resolvedHandle = resolvedHandle.split(":")[1].split("?")[0];
+        resolvedHandle = resolvedHandle.split(":")[1].split("?")[0];
       }
       setHandle(resolvedHandle);
     }
@@ -82,6 +84,7 @@ export function PayScreen({ apiBaseUrl, userId, navigation, route }: Props) {
   const { quote, isLoading: isQuoteLoading } = useQuote(amount);
 
   const onPayPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (!isVerified || !recipientWallet) {
       Alert.alert("Error", "Please enter a valid monopay handle");
       return;
@@ -104,7 +107,7 @@ export function PayScreen({ apiBaseUrl, userId, navigation, route }: Props) {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
@@ -119,16 +122,16 @@ export function PayScreen({ apiBaseUrl, userId, navigation, route }: Props) {
           {/* Recipient Profile */}
           <View style={styles.recipientCard}>
             <View style={styles.avatar}>
-               <Text style={styles.avatarText}>
+              <Text style={styles.avatarText}>
                 {isResolving ? ".." : (handle && handle.length > 1 ? (handle.startsWith("@") ? handle.substring(1, 3) : handle.substring(0, 2)) : "?").toUpperCase()}
-               </Text>
-               {isVerified && (
-                 <View style={styles.verifiedBadge}>
-                   <LucideShieldCheck color="#000" size={12} />
-                 </View>
-               )}
+              </Text>
+              {isVerified && (
+                <View style={styles.verifiedBadge}>
+                  <LucideShieldCheck color="#000" size={12} />
+                </View>
+              )}
             </View>
-            
+
             <View style={styles.handleInputContainer}>
               <TextInput
                 style={styles.handleInput}
@@ -156,14 +159,17 @@ export function PayScreen({ apiBaseUrl, userId, navigation, route }: Props) {
               <TextInput
                 style={styles.hugeAmountInput}
                 value={amount}
-                onChangeText={setAmount}
+                onChangeText={(text) => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setAmount(text);
+                }}
                 keyboardType="numeric"
                 placeholder="0"
                 placeholderTextColor="#333"
                 autoFocus
               />
             </View>
-            
+
             {quote && (
               <View style={styles.quotePill}>
                 <Text style={styles.quotePillText}>≈ {quote.sol} SOL</Text>
@@ -172,7 +178,7 @@ export function PayScreen({ apiBaseUrl, userId, navigation, route }: Props) {
           </View>
 
           {/* Message Input */}
-          <TextInput 
+          <TextInput
             style={styles.messageInput}
             placeholder="Add a message"
             placeholderTextColor="#666"
@@ -181,32 +187,38 @@ export function PayScreen({ apiBaseUrl, userId, navigation, route }: Props) {
 
         {/* Bottom Pay Bar */}
         <View style={styles.bottomBar}>
-           {/* Wallet Selector */}
-           <TouchableOpacity 
-             style={styles.walletSelectorCompact}
-             onPress={() => setShowWalletPicker(true)}
-           >
-             <View style={styles.bankIcon}>
-                <LucideWallet color="#14F195" size={16} />
-             </View>
-             <View style={{ flex: 1 }}>
-                <Text style={styles.walletNameCompact}>
-                  {allWallets.find((w: any) => w.address === publicKey.toBase58())?.handle || "Solana Account"}
-                </Text>
-                <Text style={styles.walletAddrCompact}>
-                  {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)}
-                </Text>
-             </View>
-             <LucideChevronDown color="#666" size={20} />
-           </TouchableOpacity>
+          {/* Wallet Selector */}
+          <TouchableOpacity
+            style={styles.walletSelectorCompact}
+            onPress={() => setShowWalletPicker(true)}
+          >
+            <View style={styles.bankIcon}>
+              <LucideWallet color="#14F195" size={16} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.walletNameCompact}>
+                {allWallets.find((w: any) => w.address === publicKey.toBase58())?.handle || "Solana Account"}
+              </Text>
+              <Text style={styles.walletAddrCompact}>
+                {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)}
+              </Text>
+            </View>
+            <LucideChevronDown color="#666" size={20} />
+          </TouchableOpacity>
 
-           <TouchableOpacity 
-             style={[styles.payButtonMain, (!amount || isQuoteLoading) && styles.disabledButton]} 
-             onPress={onPayPress}
-             disabled={!amount || isQuoteLoading}
-           >
-             <Text style={styles.payButtonTextMain}>Pay ₹{amount || "0"}</Text>
-           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onPayPress}
+            disabled={!amount || isQuoteLoading}
+          >
+            <LinearGradient
+              colors={['#14F195', '#0ecf7e']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.payButtonMain, (!amount || isQuoteLoading) && styles.disabledButton]}
+            >
+              <Text style={styles.payButtonTextMain}>Pay ₹{amount || "0"}</Text>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
 
@@ -219,8 +231,8 @@ export function PayScreen({ apiBaseUrl, userId, navigation, route }: Props) {
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Choose Account</Text>
             {allWallets.map((w: any) => (
-              <TouchableOpacity 
-                key={w.address} 
+              <TouchableOpacity
+                key={w.address}
                 style={[
                   styles.walletItem,
                   publicKey.toBase58() === w.address && styles.activeWalletItem
@@ -304,7 +316,7 @@ const styles = StyleSheet.create({
   },
   recipientName: { color: '#fff', fontSize: 24, fontWeight: '800' },
   recipientHandle: { color: '#666', fontSize: 14, marginTop: 4 },
-  
+
   amountContainer: { alignItems: 'center', marginVertical: 20 },
   amountInputRow: { flexDirection: 'row', alignItems: 'center' },
   currencySymbol: { color: '#fff', fontSize: 40, fontWeight: '700', marginRight: 8 },
@@ -330,7 +342,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#111',
   },
-  
+
   bottomBar: {
     padding: 24,
     paddingBottom: 40,
@@ -358,14 +370,13 @@ const styles = StyleSheet.create({
   walletNameCompact: { color: '#fff', fontSize: 14, fontWeight: '700' },
   walletAddrCompact: { color: '#666', fontSize: 12 },
   payButtonMain: {
-    backgroundColor: "#14F195",
     padding: 18,
     borderRadius: 30,
     alignItems: "center",
   },
   payButtonTextMain: { color: "#000", fontSize: 18, fontWeight: "800" },
   disabledButton: { opacity: 0.5 },
-  
+
   // Modal Overrides
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,

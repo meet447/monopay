@@ -27,7 +27,7 @@ export function PaymentSuccessScreen({ navigation, route }: any) {
       "Enter a nickname for this recipient",
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Save", onPress: (name) => name && saveContact(recipientHandle, name) }
+        { text: "Save", onPress: (name?: string) => name && saveContact(recipientHandle, name) }
       ],
       'plain-text'
     );
@@ -36,7 +36,7 @@ export function PaymentSuccessScreen({ navigation, route }: any) {
   const onShare = async () => {
     try {
       const message = `Payment Successful!\n\nSent: ₹${inrAmount}\nTo: ${recipientHandle}\nVia: monopay\n\nTransaction ID: ${signature}\nView details: https://explorer.solana.com/tx/${signature}?cluster=devnet`;
-      
+
       await Share.share({
         message,
         title: "Payment Receipt",
@@ -67,12 +67,12 @@ export function PaymentSuccessScreen({ navigation, route }: any) {
           <Text style={styles.infoLabel}>Transaction ID</Text>
           <Text style={styles.infoValue}>{signature.slice(0, 8)}...{signature.slice(-8)}</Text>
         </View>
-        
+
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Platform</Text>
           <View style={styles.platformBadge}>
-             <LucideZap size={12} color="#14F195" />
-             <Text style={styles.platformText}>monopay</Text>
+            <LucideZap size={12} color="#14F195" />
+            <Text style={styles.platformText}>monopay</Text>
           </View>
         </View>
       </View>
@@ -95,8 +95,8 @@ export function PaymentSuccessScreen({ navigation, route }: any) {
           <Text style={styles.explorerButtonText}>View on Solana Explorer</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.doneButton} 
+        <TouchableOpacity
+          style={styles.doneButton}
           onPress={() => navigation.popToTop()}
         >
           <Text style={styles.doneButtonText}>Done</Text>
@@ -114,22 +114,22 @@ const styles = StyleSheet.create({
   amountText: { color: "#fff", fontSize: 56, fontWeight: "900", marginBottom: 8 },
   recipientText: { color: "#999", fontSize: 18, marginBottom: 40 },
   divider: { width: "100%", height: 1, backgroundColor: "#222", marginBottom: 32 },
-  infoRow: { 
-    flexDirection: "row", 
-    justifyContent: "space-between", 
-    width: "100%", 
-    marginBottom: 20 
+  infoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    marginBottom: 20
   },
   infoLabel: { color: "#666", fontSize: 14 },
   infoValue: { color: "#fff", fontSize: 14, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
-  platformBadge: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    gap: 4, 
-    backgroundColor: "#111", 
-    paddingHorizontal: 8, 
-    paddingVertical: 4, 
-    borderRadius: 8 
+  platformBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#111",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8
   },
   platformText: { color: "#14F195", fontSize: 12, fontWeight: "700" },
   footer: { padding: 32, gap: 16, paddingBottom: 48 },

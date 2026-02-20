@@ -9,12 +9,16 @@ import {
   ScrollView,
   Dimensions,
   Alert,
+  Animated,
+  Easing,
 } from "react-native";
-import { 
-  LucideZap, 
-  LucideScan, 
-  LucideArrowUpRight, 
-  LucideArrowDownLeft, 
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import {
+  LucideZap,
+  LucideScan,
+  LucideArrowUpRight,
+  LucideArrowDownLeft,
   LucideSettings,
   LucideCopy,
   LucideX,
@@ -33,13 +37,13 @@ const { width } = Dimensions.get('window');
 
 export function HomeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { 
-    publicKey, 
-    disconnect, 
-    allWallets, 
-    switchWallet, 
-    balance, 
-    solPrice, 
+  const {
+    publicKey,
+    disconnect,
+    allWallets,
+    switchWallet,
+    balance,
+    solPrice,
     refreshBalance,
     transactions,
     isLoadingTransactions
@@ -49,6 +53,49 @@ export function HomeScreen({ navigation }: any) {
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
+
+  // Animation values
+  const slideAnimReceive = useMemo(() => new Animated.Value(Dimensions.get('window').height), []);
+  const slideAnimWallet = useMemo(() => new Animated.Value(Dimensions.get('window').height), []);
+
+  const openModal = (type: 'receive' | 'wallet') => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (type === 'receive') {
+      setShowReceiveModal(true);
+      Animated.timing(slideAnimReceive, {
+        toValue: 0,
+        duration: 300,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      setShowWalletModal(true);
+      Animated.timing(slideAnimWallet, {
+        toValue: 0,
+        duration: 300,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  };
+
+  const closeModal = (type: 'receive' | 'wallet') => {
+    if (type === 'receive') {
+      Animated.timing(slideAnimReceive, {
+        toValue: Dimensions.get('window').height,
+        duration: 250,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start(() => setShowReceiveModal(false));
+    } else {
+      Animated.timing(slideAnimWallet, {
+        toValue: Dimensions.get('window').height,
+        duration: 250,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start(() => setShowWalletModal(false));
+    }
+  };
 
   const [amount, setAmount] = useState("");
 
@@ -64,6 +111,7 @@ export function HomeScreen({ navigation }: any) {
 
   const copyAddress = async () => {
     if (!publicKey) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await Clipboard.setStringAsync(publicKey.toBase58());
     Alert.alert("Success", "Address copied to clipboard");
   };
@@ -78,11 +126,13 @@ export function HomeScreen({ navigation }: any) {
       Alert.alert("Success", "1 SOL dropped into your account!");
     } catch (e: any) {
       Alert.alert(
-        "Faucet Busy", 
+        "Faucet Busy",
         "Solana's public faucet is currently rate-limited. \n\nPlease use: https://faucet.solana.com/ (Select Devnet) \n\nAddress copied to clipboard!",
-        [{ text: "Copy Address & Close", onPress: async () => {
-           await Clipboard.setStringAsync(publicKey.toBase58());
-        }}]
+        [{
+          text: "Copy Address & Close", onPress: async () => {
+            await Clipboard.setStringAsync(publicKey.toBase58());
+          }
+        }]
       );
     }
   };
@@ -90,16 +140,16 @@ export function HomeScreen({ navigation }: any) {
   const formatTx = (tx: any) => {
     const time = tx.time ? new Date(tx.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Pending';
     const date = tx.time ? new Date(tx.time * 1000).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
-    
+
     const instructions = tx.details?.transaction?.message?.instructions;
     const transferIx = instructions?.find((ix: any) => ix.program === 'system' && ix.parsed?.type === 'transfer');
-    
+
     if (transferIx) {
       const info = transferIx.parsed.info;
       const isSent = info.source === publicKey.toBase58();
       const amountSol = info.lamports / LAMPORTS_PER_SOL;
       const amountInr = (amountSol * solPrice).toLocaleString(undefined, { maximumFractionDigits: 0 });
-      
+
       return {
         label: isSent ? `Sent to ${getContactName(info.destination)}` : `Received from ${getContactName(info.source)}`,
         subLabel: `${date}, ${time}`,
@@ -108,7 +158,7 @@ export function HomeScreen({ navigation }: any) {
         sol: `${amountSol.toFixed(4)} SOL`
       };
     }
-    
+
     return {
       label: 'Other Transaction',
       subLabel: `${date}, ${time}`,
@@ -123,27 +173,38 @@ export function HomeScreen({ navigation }: any) {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setShowWalletModal(true)} style={styles.walletSelector}>
+        <TouchableOpacity onPress={() => openModal('wallet')} style={styles.walletSelector}>
           <LucideUsers color="#14F195" size={20} />
           <View style={{ marginLeft: 12 }}>
             <Text style={styles.greeting}>Active Account</Text>
             <Text style={styles.walletAddr} numberOfLines={1}>
-              {allWallets.find((w: any) => w.address === publicKey.toBase58())?.handle || 
-               `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`}
+              {allWallets.find((w: any) => w.address === publicKey.toBase58())?.handle ||
+                `${publicKey.toBase58().slice(0, 4)}...${publicKey.toBase58().slice(-4)}`}
             </Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity onPress={disconnect} style={styles.settingsBtn}>
+        <TouchableOpacity
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            disconnect();
+          }}
+          style={styles.settingsBtn}
+        >
           <LucideSettings color="#666" size={24} />
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Balance Card */}
-        <View style={styles.balanceCard}>
+        <LinearGradient
+          colors={['#1a1a1a', '#0d0d0d']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.balanceCard}
+        >
           <Text style={styles.balanceLabel}>Total Balance</Text>
           <Text style={styles.balanceAmount}>
-            {balance !== null ? `₹${(balance * solPrice).toLocaleString(undefined, {maximumFractionDigits: 2})}` : '₹0.00'}
+            {balance !== null ? `₹${(balance * solPrice).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '₹0.00'}
           </Text>
           <View style={styles.balanceFooter}>
             <Text style={styles.balanceSub}>
@@ -157,7 +218,7 @@ export function HomeScreen({ navigation }: any) {
               </TouchableOpacity>
             )}
           </View>
-        </View>
+        </LinearGradient>
 
         {/* Quick Contacts */}
         {frequentPayees.length > 0 && (
@@ -165,8 +226,8 @@ export function HomeScreen({ navigation }: any) {
             <Text style={styles.sectionTitleSmall}>Quick Pay</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.contactsScroll}>
               {frequentPayees.map(contact => (
-                <TouchableOpacity 
-                  key={contact.address} 
+                <TouchableOpacity
+                  key={contact.address}
                   style={styles.contactItem}
                   onPress={() => navigation.navigate('Pay', { qrData: contact.address })}
                 >
@@ -182,9 +243,12 @@ export function HomeScreen({ navigation }: any) {
 
         {/* Quick Actions */}
         <View style={styles.quickActions}>
-          <TouchableOpacity 
-            style={styles.actionItem} 
-            onPress={() => setIsScannerVisible(true)}
+          <TouchableOpacity
+            style={styles.actionItem}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setIsScannerVisible(true);
+            }}
           >
             <View style={[styles.iconCircle, { backgroundColor: '#14F195' }]}>
               <LucideScan color="#000" size={28} />
@@ -192,9 +256,9 @@ export function HomeScreen({ navigation }: any) {
             <Text style={styles.actionText}>Scan & Pay</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionItem}
-            onPress={() => setShowReceiveModal(true)}
+            onPress={() => openModal('receive')}
           >
             <View style={[styles.iconCircle, { backgroundColor: '#333' }]}>
               <LucideArrowDownLeft color="#14F195" size={28} />
@@ -202,9 +266,12 @@ export function HomeScreen({ navigation }: any) {
             <Text style={styles.actionText}>Receive</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionItem}
-            onPress={() => navigation.navigate('Pay')}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              navigation.navigate('Pay');
+            }}
           >
             <View style={[styles.iconCircle, { backgroundColor: '#333' }]}>
               <LucideArrowUpRight color="#fff" size={28} />
@@ -221,7 +288,7 @@ export function HomeScreen({ navigation }: any) {
           ) : transactions.length === 0 ? (
             <Text style={{ color: '#444', textAlign: 'center', marginTop: 20 }}>No transactions yet</Text>
           ) : (
-            transactions.map((tx) => {
+            transactions.map((tx: any) => {
               const formatted = formatTx(tx);
               return (
                 <View key={tx.signature} style={styles.activityItem}>
@@ -248,17 +315,18 @@ export function HomeScreen({ navigation }: any) {
       {/* Receive Modal */}
       {showReceiveModal && (
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity 
-              style={styles.closeModal} 
-              onPress={() => setShowReceiveModal(false)}
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => closeModal('receive')} />
+          <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnimReceive }] }]}>
+            <TouchableOpacity
+              style={styles.closeModal}
+              onPress={() => closeModal('receive')}
             >
               <LucideX color="#666" size={24} />
             </TouchableOpacity>
-            
+
             <Text style={styles.modalTitle}>Your monopay QR</Text>
             <Text style={styles.modalSubtitle}>Scan to pay securely on Solana</Text>
-            
+
             <View style={styles.qrContainer}>
               <QRCode
                 value={solanaPayUri}
@@ -269,44 +337,46 @@ export function HomeScreen({ navigation }: any) {
             </View>
 
             <View style={styles.amountToggle}>
-               <TextInput
-                  style={styles.amountInput}
-                  placeholder="Set Amount (optional)"
-                  placeholderTextColor="#666"
-                  keyboardType="numeric"
-                  value={amount}
-                  onChangeText={setAmount}
-               />
-               <Text style={styles.amountCurrency}>INR</Text>
+              <TextInput
+                style={styles.amountInput}
+                placeholder="Set Amount (optional)"
+                placeholderTextColor="#666"
+                keyboardType="numeric"
+                value={amount}
+                onChangeText={setAmount}
+              />
+              <Text style={styles.amountCurrency}>INR</Text>
             </View>
 
             <TouchableOpacity style={styles.copyButton} onPress={copyAddress}>
               <LucideCopy color="#14F195" size={18} />
               <Text style={styles.copyText}>Copy Address</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         </View>
       )}
 
       {/* Wallet Switcher Modal */}
       {showWalletModal && (
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity style={styles.closeModal} onPress={() => setShowWalletModal(false)}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => closeModal('wallet')} />
+          <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnimWallet }] }]}>
+            <TouchableOpacity style={styles.closeModal} onPress={() => closeModal('wallet')}>
               <LucideX color="#000" size={24} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Switch Account</Text>
             <ScrollView style={{ width: '100%', maxHeight: 300 }}>
               {allWallets.map((w: any) => (
-                <TouchableOpacity 
-                  key={w.address} 
+                <TouchableOpacity
+                  key={w.address}
                   style={[
                     styles.walletItem,
                     publicKey.toBase58() === w.address && styles.activeWalletItem
                   ]}
                   onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                     switchWallet(w.address);
-                    setShowWalletModal(false);
+                    closeModal('wallet');
                   }}
                 >
                   <Text style={styles.walletLabel}>{w.handle || w.label}</Text>
@@ -314,23 +384,24 @@ export function HomeScreen({ navigation }: any) {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.addWalletBtn}
               onPress={() => {
-                setShowWalletModal(false);
-                disconnect(); 
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                closeModal('wallet');
+                setTimeout(() => disconnect(), 300); // disconnect after animation
               }}
             >
               <Text style={styles.addWalletText}>+ Link New Account</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         </View>
       )}
 
-      <QRScanner 
-        visible={isScannerVisible} 
-        onClose={() => setIsScannerVisible(false)} 
-        onScan={onScan} 
+      <QRScanner
+        visible={isScannerVisible}
+        onClose={() => setIsScannerVisible(false)}
+        onScan={onScan}
       />
     </View>
   );
@@ -403,10 +474,10 @@ const styles = StyleSheet.create({
   },
   balanceLabel: { color: "#666", fontSize: 14, marginBottom: 8 },
   balanceAmount: { color: "#fff", fontSize: 36, fontWeight: "900" },
-  balanceFooter: { 
-    marginTop: 12, 
-    paddingTop: 12, 
-    borderTopWidth: 1, 
+  balanceFooter: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
     borderTopColor: "#222",
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -431,24 +502,27 @@ const styles = StyleSheet.create({
   activityName: { color: "#fff", fontWeight: "600", fontSize: 15 },
   activityDate: { color: "#444", fontSize: 12 },
   activityAmount: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  
+
   // Modal
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.85)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
+    justifyContent: "flex-end",
     zIndex: 1000,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.85)",
   },
   modalContent: {
     backgroundColor: "#fff",
     width: "100%",
-    borderRadius: 32,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     padding: 32,
+    paddingBottom: 48,
     alignItems: "center",
   },
-  closeModal: { position: "absolute", top: 20, right: 20 },
+  closeModal: { position: "absolute", top: 20, right: 20, zIndex: 10 },
   modalTitle: { fontSize: 24, fontWeight: "800", color: "#000", marginBottom: 8 },
   modalSubtitle: { fontSize: 14, color: "#666", marginBottom: 32 },
   qrContainer: {

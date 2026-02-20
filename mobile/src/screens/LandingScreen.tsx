@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,7 +12,10 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   ScrollView,
+  Animated,
+  Easing,
 } from "react-native";
+import * as Haptics from 'expo-haptics';
 import { LucideZap, LucidePlus } from "lucide-react-native";
 import { useWallet } from "../context/WalletContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,10 +25,30 @@ export function LandingScreen() {
   const insets = useSafeAreaInsets();
   const { importWallet } = useWallet() as any;
   const [showImport, setShowImport] = useState(false);
+  const fadeAnim = useMemo(() => new Animated.Value(0), []);
+  const slideAnim = useMemo(() => new Animated.Value(20), []);
+
   const [privateKey, setPrivateKey] = useState("");
   const [handle, setHandle] = useState("");
   const [label] = useState("Main Account");
   const [loading, setLoading] = useState(false);
+
+  const handleShowImport = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowImport(true);
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true })
+    ]).start();
+  };
+
+  const handleHideImport = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 20, duration: 300, easing: Easing.in(Easing.cubic), useNativeDriver: true })
+    ]).start(() => setShowImport(false));
+  };
 
   const handleImport = async () => {
     if (!privateKey) return;
@@ -51,7 +74,7 @@ export function LandingScreen() {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={{ flex: 1 }}
         >
-          <ScrollView 
+          <ScrollView
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
           >
@@ -61,16 +84,16 @@ export function LandingScreen() {
 
             {!showImport ? (
               <View style={styles.buttonGroup}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.primaryButton}
-                  onPress={() => setShowImport(true)}
+                  onPress={handleShowImport}
                 >
                   <LucidePlus color="#000" size={20} />
                   <Text style={styles.buttonText}>Link Bank (Wallet)</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <View style={styles.importForm}>
+              <Animated.View style={[styles.importForm, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
                 <View>
                   <Text style={styles.label}>Choose Handle</Text>
                   <TextInput
@@ -98,17 +121,20 @@ export function LandingScreen() {
                   />
                 </View>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.primaryButton}
-                  onPress={handleImport}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    handleImport();
+                  }}
                   disabled={loading}
                 >
                   {loading ? <ActivityIndicator color="#000" /> : <Text style={styles.buttonText}>Link Account</Text>}
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setShowImport(false)}>
+                <TouchableOpacity onPress={handleHideImport}>
                   <Text style={styles.cancelText}>Cancel</Text>
                 </TouchableOpacity>
-              </View>
+              </Animated.View>
             )}
           </ScrollView>
         </KeyboardAvoidingView>
