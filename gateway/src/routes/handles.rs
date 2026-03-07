@@ -6,7 +6,7 @@ use axum::Json;
 
 const VPA_DOMAIN: &str = "@monopay.app";
 
-fn normalize_handle(value: &str) -> String {
+pub fn normalize_handle(value: &str) -> String {
     let mut trimmed = value.trim().to_lowercase();
     if trimmed.starts_with('@') {
         trimmed.remove(0);

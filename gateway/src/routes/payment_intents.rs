@@ -35,14 +35,10 @@ pub async fn create_payment_intent(
     }
 
     let mut store = state.store.write().await;
+    let normalized_handle = crate::routes::handles::normalize_handle(&payload.recipient_handle);
     let recipient_wallet = store
         .handles
-        .get(&payload.recipient_handle.to_lowercase())
-        .or_else(|| {
-            store
-                .handles
-                .get(&format!("@{}", payload.recipient_handle.to_lowercase()))
-        })
+        .get(&normalized_handle)
         .ok_or_else(|| AppError::not_found("recipient handle not found"))?
         .clone();
 
