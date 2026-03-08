@@ -37,11 +37,31 @@ type Props = {
   route: any;
 };
 
+// Detect raw Solana wallet addresses (base58, 32–44 chars, no spaces or @)
+function isSolanaAddress(value: string): boolean {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+}
+
+// Parse QR data upfront — strips monopay:/solana: prefixes and @ signs
+function parseQrData(raw: string): string {
+  let value = raw.trim();
+  if (value.startsWith("monopay:")) {
+    value = value.split(":")[1].split("?")[0];
+  } else if (value.startsWith("solana:")) {
+    value = value.split(":")[1].split("?")[0];
+  }
+  if (value.startsWith("@")) value = value.slice(1);
+  return value;
+}
+
 export function PayScreen({ apiBaseUrl, navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { publicKey, allWallets, switchWallet } = useWallet() as any;
 
-  const [handle, setHandle] = useState(route?.params?.qrData || "");
+  // Parse QR data immediately so resolution effect starts with a clean handle
+  const [handle, setHandle] = useState(() =>
+    route?.params?.qrData ? parseQrData(route.params.qrData) : ""
+  );
   const [resolvedName, setResolvedName] = useState("");
   const [recipientWallet, setRecipientWallet] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
@@ -70,6 +90,15 @@ export function PayScreen({ apiBaseUrl, navigation, route }: Props) {
         return;
       }
 
+      // Raw Solana wallet address — skip handle resolution
+      if (isSolanaAddress(handle)) {
+        const short = `${handle.slice(0, 4)}...${handle.slice(-4)}`;
+        setResolvedName(short);
+        setRecipientWallet(handle);
+        setIsVerified(true);
+        return;
+      }
+
       setIsResolving(true);
       try {
         const client = new ApiClient({ baseUrl: apiBaseUrl });
@@ -92,9 +121,18 @@ export function PayScreen({ apiBaseUrl, navigation, route }: Props) {
   useEffect(() => {
     if (!route?.params?.qrData) return;
 
-    let resolvedHandle = route.params.qrData;
-    if (resolvedHandle.startsWith("solana:")) {
+    let resolvedHandle = route.params.qrData as string;
+    // Strip monopay: URI prefix → gives the handle directly
+    if (resolvedHandle.startsWith("monopay:")) {
       resolvedHandle = resolvedHandle.split(":")[1].split("?")[0];
+    }
+    // Strip solana: URI prefix → gives raw wallet address
+    else if (resolvedHandle.startsWith("solana:")) {
+      resolvedHandle = resolvedHandle.split(":")[1].split("?")[0];
+    }
+    // Strip leading @ for handle inputs
+    if (resolvedHandle.startsWith("@")) {
+      resolvedHandle = resolvedHandle.slice(1);
     }
     setHandle(resolvedHandle);
   }, [route?.params?.qrData]);

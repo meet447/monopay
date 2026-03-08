@@ -78,8 +78,13 @@ export function HomeScreen({ navigation }: any) {
 
   const solanaPayUri = useMemo(() => {
     if (!publicKey) return "";
+    // Prefer the monopay handle so the scanner resolves it as a handle, not a raw address
+    if (activeWallet?.handle) {
+      const handlePart = activeWallet.handle.replace("@monopay.app", "").replace(/^@/, "");
+      return amount ? `monopay:${handlePart}?amount=${amount}` : `monopay:${handlePart}`;
+    }
     return `solana:${publicKey.toBase58()}?amount=${amount || 0}&label=monopay`;
-  }, [publicKey, amount]);
+  }, [publicKey, activeWallet, amount]);
 
   const openModal = (type: "receive" | "wallet") => {
     if (type === "receive") {

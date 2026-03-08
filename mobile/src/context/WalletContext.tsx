@@ -11,7 +11,7 @@ import { API_BASE_URL } from '../config';
 
 // Extending state to support multiple wallets
 export type MultiWalletContextState = WalletContextState & {
-  allWallets: Array<{address: string, label: string, handle?: string}>;
+  allWallets: Array<{ address: string, label: string, handle?: string }>;
   importWallet: (privateKey: string, label: string, handle?: string) => Promise<void>;
   switchWallet: (address: string) => void;
   getActiveKeypair: () => Promise<Keypair | null>;
@@ -29,7 +29,7 @@ const ACTIVE_WALLET_KEY = 'monopay_active_wallet';
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [publicKey, setPublicKey] = useState<PublicKey | null>(null);
-  const [allWallets, setAllWallets] = useState<Array<{address: string, label: string}>>([]);
+  const [allWallets, setAllWallets] = useState<Array<{ address: string, label: string, handle?: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [balance, setBalance] = useState<number | null>(null);
   const [solPrice, setSolPrice] = useState<number>(15000);
@@ -47,16 +47,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       ]);
       setBalance(bal / LAMPORTS_PER_SOL);
       setSolPrice(price);
-      
+
       // Fetch Transactions more sparingly to avoid 429s
       setIsLoadingTransactions(true);
       const signatures = await connection.getSignaturesForAddress(publicKey, { limit: 5 });
-      
+
       const txDetails = [];
       for (const sig of signatures) {
         try {
-          const tx = await connection.getParsedTransaction(sig.signature, { 
-            maxSupportedTransactionVersion: 0 
+          const tx = await connection.getParsedTransaction(sig.signature, {
+            maxSupportedTransactionVersion: 0
           });
           txDetails.push({
             signature: sig.signature,
@@ -90,11 +90,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       try {
         const savedWallets = await SecureStore.getItemAsync(WALLETS_STORAGE_KEY);
         const activeAddr = await SecureStore.getItemAsync(ACTIVE_WALLET_KEY);
-        
+
         if (savedWallets) {
           const parsed = JSON.parse(savedWallets);
           setAllWallets(parsed);
-          
+
           if (activeAddr) {
             setPublicKey(new PublicKey(activeAddr));
           } else if (parsed.length > 0) {
@@ -110,21 +110,35 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     loadWallets();
   }, []);
 
+  // Re-register all handles on startup — gateway in-memory store is wiped on every restart
+  useEffect(() => {
+    if (allWallets.length === 0) return;
+    const client = new ApiClient({ baseUrl: API_BASE_URL });
+    for (const wallet of allWallets) {
+      if (wallet.handle) {
+        const handlePart = wallet.handle.replace('@monopay.app', '').replace(/^@/, '');
+        client.registerHandle({ handle: handlePart, wallet: wallet.address }).catch(() => {
+          // Ignore errors — gateway may not be reachable yet
+        });
+      }
+    }
+  }, [allWallets.length]);
+
   const importWallet = useCallback(async (privateKey: string, label: string, handle?: string) => {
     try {
       let keypair: Keypair;
       const trimmed = privateKey.trim();
-      
+
       // Handle secret array format [1,2,3...]
       if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
         const secretKey = new Uint8Array(JSON.parse(trimmed));
         keypair = Keypair.fromSecretKey(secretKey);
-      } 
+      }
       // Handle comma separated list
       else if (trimmed.includes(',')) {
         const secretKey = new Uint8Array(trimmed.split(',').map(n => parseInt(n.trim())));
         keypair = Keypair.fromSecretKey(secretKey);
-      } 
+      }
       // Handle Base58
       else {
         try {
@@ -144,14 +158,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       }
 
       const secretBase64 = Buffer.from(keypair.secretKey).toString('base64');
-      
+
       // Store the secret key encrypted by the OS keychain
       await SecureStore.setItemAsync(`secret_${address}`, secretBase64);
-      
+
       const newList = [...allWallets, { address, label, handle }];
       await SecureStore.setItemAsync(WALLETS_STORAGE_KEY, JSON.stringify(newList));
       await SecureStore.setItemAsync(ACTIVE_WALLET_KEY, address);
-      
+
       setAllWallets(newList);
       setPublicKey(keypair.publicKey);
     } catch (e: any) {
@@ -169,7 +183,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const address = publicKey.toBase58();
     const secretBase64 = await SecureStore.getItemAsync(`secret_${address}`);
     if (!secretBase64) return null;
-    
+
     const secretKey = Buffer.from(secretBase64, 'base64');
     return Keypair.fromSecretKey(new Uint8Array(secretKey));
   }, [publicKey]);
@@ -181,17 +195,17 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const disconnect = useCallback(async () => {
     await SecureStore.deleteItemAsync(WALLETS_STORAGE_KEY);
     await SecureStore.deleteItemAsync(ACTIVE_WALLET_KEY);
-    await resetPin(); 
+    await resetPin();
     setPublicKey(null);
     setAllWallets([]);
   }, [resetPin]);
 
   return (
-    <MultiWalletContext.Provider value={{ 
-      publicKey, 
-      allWallets, 
-      connect, 
-      disconnect, 
+    <MultiWalletContext.Provider value={{
+      publicKey,
+      allWallets,
+      connect,
+      disconnect,
       isLoading,
       importWallet,
       switchWallet,
