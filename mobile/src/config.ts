@@ -1,4 +1,12 @@
-// Use 10.0.2.2 for Android Emulator, localhost for iOS simulator, or your local IP for physical devices
-export const API_BASE_URL = "http://192.168.29.36:8080";
+import { Platform } from "react-native";
+
+// Use your machine's local IP for physical device testing
+const DEV_HOST = "192.168.29.36";
+
+// Override with your machine's local IP when testing on a physical device
+export const API_BASE_URL = __DEV__
+  ? `http://${DEV_HOST}:8080`
+  : "https://api.monopay.app"; // TODO: set production URL
+
 export const DEMO_USER_ID = "usr_demo";
 export const VPA_DOMAIN = "@monopay.app";

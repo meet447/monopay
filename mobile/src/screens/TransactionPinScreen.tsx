@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   StyleSheet,
   Text,
   View,
@@ -16,8 +17,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePin } from "../context/PinContext";
 import { useWallet } from "../context/WalletContext";
 import { runUpiLikePayFlow } from "../features/pay/payController";
-import { ApiClient } from "../api/client";
-import { API_BASE_URL, DEMO_USER_ID } from "../config";
 import { PremiumBackground } from "../components/PremiumBackground";
 import { GlassCard } from "../components/GlassCard";
 import { ScalePressable } from "../components/ScalePressable";
@@ -32,11 +31,6 @@ export function TransactionPinScreen({ navigation, route }: any) {
   const [pin, setPin] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState("");
-
-  const client = useMemo(
-    () => new ApiClient({ baseUrl: API_BASE_URL, userId: DEMO_USER_ID }),
-    []
-  );
 
   const handleKeyPress = (value: string) => {
     if (isProcessing) return;
@@ -70,11 +64,9 @@ export function TransactionPinScreen({ navigation, route }: any) {
       const keypair = await getActiveKeypair();
       if (!keypair) throw new Error("Failed to retrieve account keys");
 
-      const result = await runUpiLikePayFlow(client, {
-        recipientHandle,
+      const result = await runUpiLikePayFlow({
         recipientWallet,
         inrAmount,
-        pin,
         senderKeypair: keypair,
       });
 
@@ -128,53 +120,70 @@ export function TransactionPinScreen({ navigation, route }: any) {
           ) : (
             <Text style={styles.helperText}>Enter your secure PIN</Text>
           )}
-        </View>
 
-        <View style={styles.keypad}>
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-            <ScalePressable
-              key={num}
-              style={styles.key}
-              onPress={() => handleKeyPress(num.toString())}
-              haptic="light"
-            >
-              <Text style={styles.keyText}>{num}</Text>
-            </ScalePressable>
-          ))}
+          <View style={styles.keypad}>
+            <View style={styles.keyRow}>
+              {[1, 2, 3].map((num) => (
+                <ScalePressable key={num} style={styles.key} onPress={() => handleKeyPress(num.toString())} haptic="light">
+                  <Text style={styles.keyText}>{num}</Text>
+                </ScalePressable>
+              ))}
+            </View>
+            <View style={styles.keyRow}>
+              {[4, 5, 6].map((num) => (
+                <ScalePressable key={num} style={styles.key} onPress={() => handleKeyPress(num.toString())} haptic="light">
+                  <Text style={styles.keyText}>{num}</Text>
+                </ScalePressable>
+              ))}
+            </View>
+            <View style={styles.keyRow}>
+              {[7, 8, 9].map((num) => (
+                <ScalePressable key={num} style={styles.key} onPress={() => handleKeyPress(num.toString())} haptic="light">
+                  <Text style={styles.keyText}>{num}</Text>
+                </ScalePressable>
+              ))}
+            </View>
+            <View style={styles.keyRow}>
+              <View style={styles.key} />
+              <ScalePressable style={styles.key} onPress={() => handleKeyPress("0")} haptic="light">
+                <Text style={styles.keyText}>0</Text>
+              </ScalePressable>
+              <ScalePressable style={styles.key} onPress={handleDelete} haptic="light">
+                <LucideDelete color={premiumColors.textPrimary} size={24} />
+              </ScalePressable>
+            </View>
+          </View>
 
-          <View style={styles.key} />
-          <ScalePressable style={styles.key} onPress={() => handleKeyPress("0")} haptic="light">
-            <Text style={styles.keyText}>0</Text>
-          </ScalePressable>
-          <ScalePressable style={styles.key} onPress={handleDelete} haptic="light">
-            <LucideDelete color={premiumColors.textPrimary} size={24} />
-          </ScalePressable>
-        </View>
-
-        <ScalePressable
-          onPress={submitPin}
-          disabled={pin.length < 4 || isProcessing}
-          style={[styles.confirmWrap, (pin.length < 4 || isProcessing) && styles.confirmWrapDisabled]}
-          haptic="medium"
-        >
-          <LinearGradient
-            colors={[...premiumGradients.accent]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.confirmButton}
+          <ScalePressable
+            onPress={submitPin}
+            disabled={pin.length < 4 || isProcessing}
+            style={[styles.confirmWrap, (pin.length < 4 || isProcessing) && styles.confirmWrapDisabled]}
+            haptic="medium"
           >
-            <Text style={styles.confirmText}>Confirm Payment</Text>
-          </LinearGradient>
-        </ScalePressable>
+            <LinearGradient
+              colors={[...premiumGradients.accent]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.confirmButton}
+            >
+              <Text style={styles.confirmText}>Confirm Payment</Text>
+            </LinearGradient>
+          </ScalePressable>
 
-        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) }]}> 
-          <LucideShieldCheck color={premiumColors.textMuted} size={14} />
-          <Text style={styles.footerText}>Securely signed by monopay</Text>
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+            <LucideShieldCheck color={premiumColors.textMuted} size={14} />
+            <Text style={styles.footerText}>Securely signed by monopay</Text>
+          </View>
         </View>
       </View>
     </PremiumBackground>
   );
 }
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const KEYPAD_PADDING = 20 * 2; // container horizontal padding
+const KEY_GAP = 12;
+const KEY_WIDTH = (SCREEN_WIDTH - KEYPAD_PADDING - KEY_GAP * 2) / 3;
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 20 },
@@ -201,6 +210,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   content: {
+    flex: 1,
     alignItems: "center",
   },
   txInfo: {
@@ -254,18 +264,21 @@ const styles = StyleSheet.create({
   },
   keypad: {
     marginTop: 22,
+    width: "100%",
+  },
+  keyRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     justifyContent: "space-between",
+    marginBottom: 12,
+    gap: 12,
   },
   key: {
-    width: "30%",
+    width: KEY_WIDTH,
     height: 64,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: premiumColors.borderSoft,
     backgroundColor: premiumColors.surface,
-    marginBottom: 12,
     justifyContent: "center",
     alignItems: "center",
   },

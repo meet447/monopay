@@ -1,15 +1,4 @@
-import type {
-  ExecuteIntentRequest,
-  ExecuteIntentResponse,
-  HandleResponse,
-  PaymentIntentCreateRequest,
-  PaymentIntentCreateResponse,
-  PaymentIntentStatusResponse,
-  PinVerifyResponse,
-  QuoteResponse,
-  SessionResponse,
-  UpsertHandleRequest,
-} from "../types/api";
+import type { HandleResponse, UpsertHandleRequest } from "../types/api";
 
 type ApiClientOptions = {
   baseUrl: string;
@@ -26,11 +15,11 @@ export class ApiClient {
     if (this.options.userId) {
       headers["x-user-id"] = this.options.userId;
     }
-    
+
     console.log(`[API Request] ${init?.method || 'GET'} ${this.options.baseUrl}${path}`);
-    
+
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
       const response = await fetch(`${this.options.baseUrl}${path}`, {
@@ -70,37 +59,8 @@ export class ApiClient {
     }
   }
 
-  async verifyPin(pin: string): Promise<PinVerifyResponse> {
-    return this.request<PinVerifyResponse>("/v1/pin/verify", {
-      method: "POST",
-      body: JSON.stringify({ pin }),
-    });
-  }
-
-  async getCurrentSession(): Promise<SessionResponse> {
-    return this.request<SessionResponse>("/v1/sessions/current");
-  }
-
-  async getUsdcQuote(inr: number): Promise<QuoteResponse> {
-    return this.request<QuoteResponse>(`/v1/quotes/usdc?inr=${inr}`);
-  }
-
-  async createPaymentIntent(payload: PaymentIntentCreateRequest): Promise<PaymentIntentCreateResponse> {
-    return this.request<PaymentIntentCreateResponse>("/v1/payment-intents", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-  }
-
-  async executePaymentIntent(id: string, payload: ExecuteIntentRequest): Promise<ExecuteIntentResponse> {
-    return this.request<ExecuteIntentResponse>(`/v1/payment-intents/${id}/execute`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-  }
-
-  async getPaymentIntent(id: string): Promise<PaymentIntentStatusResponse> {
-    return this.request<PaymentIntentStatusResponse>(`/v1/payment-intents/${id}`);
+  async resolveHandle(handle: string): Promise<HandleResponse> {
+    return this.request<HandleResponse>(`/v1/handles/${handle}`);
   }
 
   async registerHandle(payload: UpsertHandleRequest): Promise<HandleResponse> {
@@ -108,9 +68,5 @@ export class ApiClient {
       method: "POST",
       body: JSON.stringify(payload),
     });
-  }
-
-  async resolveHandle(handle: string): Promise<HandleResponse> {
-    return this.request<HandleResponse>(`/v1/handles/${handle}`);
   }
 }

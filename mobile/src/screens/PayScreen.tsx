@@ -280,14 +280,7 @@ export function PayScreen({ apiBaseUrl, navigation, route }: Props) {
               </LinearGradient>
             </ScalePressable>
 
-            <ScalePressable
-              style={styles.tapToPayButton}
-              onPress={() => navigation.navigate("MerchantTap", { amount })}
-              haptic="light"
-            >
-              <LucideWifi color={premiumColors.accent} size={18} />
-              <Text style={styles.tapToPayText}>Receive via Tap</Text>
-            </ScalePressable>
+            {/* NFC Tap-to-Pay disabled for Expo Go compatibility */}
           </View>
         </KeyboardAvoidingView>
 

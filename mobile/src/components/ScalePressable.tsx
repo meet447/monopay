@@ -4,6 +4,7 @@ import {
   Pressable,
   PressableProps,
   StyleProp,
+  StyleSheet,
   ViewStyle,
 } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -26,6 +27,28 @@ export function ScalePressable({
   onPressOut,
   ...rest
 }: Props) {
+  const flat = StyleSheet.flatten(style) as ViewStyle | undefined;
+
+  // Layout & positioning props go on the outer Pressable
+  const {
+    flex, width, height, alignSelf,
+    position, top, right, bottom, left, zIndex,
+    margin, marginTop, marginRight, marginBottom, marginLeft,
+    marginHorizontal, marginVertical,
+    ...innerStyle
+  } = flat || {} as ViewStyle;
+
+  const outerRaw: Record<string, any> = {
+    flex, width, height, alignSelf,
+    position, top, right, bottom, left, zIndex,
+    margin, marginTop, marginRight, marginBottom, marginLeft,
+    marginHorizontal, marginVertical,
+  };
+  // Strip undefined keys so they don't interfere with defaults
+  const outerStyle: ViewStyle = Object.fromEntries(
+    Object.entries(outerRaw).filter(([, v]) => v !== undefined)
+  ) as ViewStyle;
+
   const scale = useRef(new Animated.Value(1)).current;
 
   const triggerScale = (toValue: number) => {
@@ -50,6 +73,7 @@ export function ScalePressable({
   return (
     <Pressable
       {...rest}
+      style={outerStyle}
       onPressIn={(e) => {
         triggerScale(activeScale);
         triggerHaptic();
@@ -60,7 +84,7 @@ export function ScalePressable({
         onPressOut?.(e);
       }}
     >
-      <Animated.View style={[style, { transform: [{ scale }] }]}>
+      <Animated.View style={[innerStyle, { transform: [{ scale }] }]}>
         {children}
       </Animated.View>
     </Pressable>

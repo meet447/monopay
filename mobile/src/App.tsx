@@ -11,7 +11,7 @@ import { PinEnrollScreen } from "./screens/PinEnrollScreen";
 import { PayScreen } from "./screens/PayScreen";
 import { TransactionPinScreen } from "./screens/TransactionPinScreen";
 import { PaymentSuccessScreen } from "./screens/PaymentSuccessScreen";
-import { MerchantTapScreen } from "./screens/MerchantTapScreen";
+// import { MerchantTapScreen } from "./screens/MerchantTapScreen"; // NFC disabled
 import { CustomerTapListener } from "./components/CustomerTapListener";
 
 import { API_BASE_URL, DEMO_USER_ID } from "./config";
@@ -64,11 +64,7 @@ function RootStack() {
             component={HomeScreen}
             options={{ animation: "fade" }}
           />
-          <Stack.Screen
-            name="MerchantTap"
-            component={MerchantTapScreen}
-            options={{ animation: "slide_from_bottom" }}
-          />
+          {/* MerchantTap screen disabled — NFC not available in Expo Go */}
           <Stack.Screen name="Pay">
             {(props) => <PayScreen {...props} apiBaseUrl={API_BASE_URL} userId={DEMO_USER_ID} />}
           </Stack.Screen>

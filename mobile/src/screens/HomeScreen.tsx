@@ -382,7 +382,13 @@ export function HomeScreen({ navigation }: any) {
               <Text style={styles.modalSubtitle}>Share this code to receive payment securely.</Text>
 
               <View style={styles.qrContainer}>
-                <QRCode value={solanaPayUri} size={190} color="#102032" backgroundColor="#FFFFFF" />
+                {solanaPayUri ? (
+                  <QRCode value={solanaPayUri} size={190} color="#102032" backgroundColor="#FFFFFF" />
+                ) : (
+                  <View style={{ width: 190, height: 190, justifyContent: "center", alignItems: "center" }}>
+                    <Text style={{ color: premiumColors.textMuted }}>Loading...</Text>
+                  </View>
+                )}
               </View>
 
               <View style={styles.amountToggle}>
